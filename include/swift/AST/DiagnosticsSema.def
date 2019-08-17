@@ -918,7 +918,9 @@ WARNING(isa_is_foreign_check,none,
 WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
-
+WARNING(unecessary_same_type_coercion,none,
+      "casting expression to %0 doesn't change the type",
+      (Type))
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
 

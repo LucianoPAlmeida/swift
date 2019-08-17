@@ -3533,6 +3533,15 @@ namespace {
         Expr *sub = expr->getSubExpr();
 
         cs.setExprTypes(sub);
+        
+        if (!SuppressDiagnostics) {
+          // If we are trying to perform coercion to the same type emit a warning.
+          if (cs.getType(sub)->isEqual(toType)) {
+            tc.diagnose(expr->getLoc(), diag::unecessary_same_type_coercion, toType)
+              .fixItRemove(SourceRange(expr->getLoc(),
+                                       expr->getCastTypeLoc().getSourceRange().End));
+          }
+        }
 
         if (tc.convertToType(sub, toType, cs.DC))
           return nullptr;
