@@ -2811,6 +2811,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                          formUnsolvedResult);
         }
       }
+      
+      if (locator.getBaseLocator()->isTypeCoercion()) {
+        auto expr = dyn_cast<CoerceExpr>(locator.getBaseLocator()->getAnchor());
+        if (!shouldSuppressDiagnostics()) {
+          // If we are trying to perform coercion to the same type emit a warning.
+          if (type1->getCanonicalType()->isEqual(type2->getCanonicalType())) {
+            TC.diagnose(expr->getLoc(), diag::unecessary_same_type_coercion, type2)
+              .fixItRemove(SourceRange(expr->getLoc(),
+                                       expr->getCastTypeLoc().getSourceRange().End));
+          }
+        }
+      }
+      
       return formUnsolvedResult();
     }
 

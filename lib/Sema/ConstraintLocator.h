@@ -139,6 +139,8 @@ public:
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
+    /// A type coercion
+    TypeCoercion,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -173,6 +175,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case TypeCoercion:
       return 0;
 
     case ContextualType:
@@ -244,6 +247,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case TypeCoercion:
       return 0;
 
     case FunctionArgument:
@@ -553,6 +557,10 @@ public:
     return (getSummaryFlags() & IsFunctionConversion);
   }
 
+  /// Determine whether given locator points to the type coercion
+  /// e.g. "Hello" as String
+  bool isTypeCoercion() const;
+  
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;

@@ -84,6 +84,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case TypeCoercion:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -92,6 +93,18 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       break;
     }
   }
+}
+
+/// Determine whether given locator points to the type coercion
+/// e.g. "Hello" as String
+bool ConstraintLocator::isTypeCoercion() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+  
+  if (!anchor || path.empty())
+    return false;
+  
+  return path.back().getKind() == ConstraintLocator::TypeCoercion;
 }
 
 /// Determine whether given locator points to the subscript reference
@@ -401,6 +414,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathComponentResult:
       out << "key path component result";
+      break;
+        
+    case TypeCoercion:
+      out << "type coercion";
       break;
     }
   }
