@@ -2659,9 +2659,7 @@ namespace {
       CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
-      
-      auto pathElt = LocatorPathElt(ConstraintLocator::TypeCoercion);
-      auto locator = CS.getConstraintLocator(expr, pathElt);
+      auto locator = CS.getConstraintLocator(expr);
 
       // Add a conversion constraint for the direct conversion between
       // types.

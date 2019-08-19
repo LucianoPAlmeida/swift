@@ -2812,14 +2812,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
       
+      // If we are trying to perform coercion to the same type emit a warning.
       if (locator.getBaseLocator()->isTypeCoercion()) {
-        auto expr = dyn_cast<CoerceExpr>(locator.getBaseLocator()->getAnchor());
-        if (!shouldSuppressDiagnostics()) {
-          // If we are trying to perform coercion to the same type emit a warning.
-          if (type1->getCanonicalType()->isEqual(type2->getCanonicalType())) {
-            TC.diagnose(expr->getLoc(), diag::unecessary_same_type_coercion, type2)
-              .fixItRemove(SourceRange(expr->getLoc(),
-                                       expr->getCastTypeLoc().getSourceRange().End));
+        if (auto expr = dyn_cast<CoerceExpr>(locator.getBaseLocator()->getAnchor())) {
+          if (!shouldSuppressDiagnostics()) {
+            if (type1->getCanonicalType()->isEqual(type2->getCanonicalType())) {
+              TC.diagnose(expr->getLoc(), diag::unecessary_same_type_coercion, type2)
+                .fixItRemove(SourceRange(expr->getLoc(),
+                                         expr->getCastTypeLoc().getSourceRange().End));
+            }
           }
         }
       }
@@ -7521,9 +7522,12 @@ void ConstraintSystem::addExplicitConversionConstraint(
   auto locatorPtr = getConstraintLocator(locator);
 
   // Coercion (the common case).
+  auto coercionPath = LocatorPathElt(ConstraintLocator::TypeCoercion);
+  auto coerceLocator = getConstraintLocator(locator.getBaseLocator(),
+                                            coercionPath);
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, locatorPtr);
+                       fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 

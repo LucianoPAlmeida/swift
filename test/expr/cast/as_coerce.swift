@@ -137,18 +137,18 @@ _ = sr6022_1 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' 
 _ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
 
 // SR-11295
-let a = "Hello"
-_ = a as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{7-17=}}
+let sr11295a = "Hello"
+_ = sr11295a as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{7-17=}}
 
-let b = 1
-_ = b as Int // expected-warning {{casting expression to 'Int' doesn't change the type}} {{7-14=}}
+let sr11295b = 1
+_ = sr11295b as Int // expected-warning {{casting expression to 'Int' doesn't change the type}} {{7-14=}}
 
 typealias Type = String
 
-let c: Type = "Hello Typealias" 
-_ = c as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{7-17=}}
+let sr11295c: Type = "Hello Typealias"
+_ = sr11295c as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{7-17=}}
 
-let d = "Hello Typealias"
-_ = d as Type // expected-warning {{casting expression to 'Type' (aka 'String') doesn't change the type}} {{7-15=}}
+let sr11295d = "Hello Typealias"
+_ = sr11295d as Type // expected-warning {{casting expression to 'Type' (aka 'String') doesn't change the type}} {{7-15=}}
 
 _ = "Hello" as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{13-23=}}
