@@ -95,18 +95,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   }
 }
 
-/// Determine whether given locator points to the type coercion
-/// e.g. "Hello" as String
-bool ConstraintLocator::isTypeCoercion() const {
-  auto *anchor = getAnchor();
-  auto path = getPath();
-  
-  if (!anchor || path.empty())
-    return false;
-  
-  return path.back().getKind() == ConstraintLocator::TypeCoercion;
-}
-
 /// Determine whether given locator points to the subscript reference
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {

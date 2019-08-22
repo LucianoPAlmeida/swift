@@ -556,10 +556,6 @@ public:
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
   }
-
-  /// Determine whether given locator points to the type coercion
-  /// e.g. "Hello" as String
-  bool isTypeCoercion() const;
   
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
