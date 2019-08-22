@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 511; // ctor failability change
+const uint16_t SWIFTMODULE_VERSION_MINOR = 512; // extended types may be left as unbound generic types
 
 using DeclIDField = BCFixed<31>;
 
@@ -300,7 +300,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
   

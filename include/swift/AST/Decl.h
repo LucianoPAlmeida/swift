@@ -286,7 +286,7 @@ public:
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+2+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -300,10 +300,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// Whether we've already performed early attribute validation.
-    /// FIXME: This is ugly.
-    EarlyAttrValidation : 1,
 
     /// The validation state of this declaration.
     ValidationState : 2,
@@ -694,7 +690,6 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.EarlyAttrValidation = false;
     Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
@@ -836,14 +831,6 @@ public:
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
 
-  /// Whether we have already done early attribute validation.
-  bool didEarlyAttrValidation() const { return Bits.Decl.EarlyAttrValidation; }
-
-  /// Set whether we've performed early attribute validation.
-  void setEarlyAttrValidation(bool validated = true) {
-    Bits.Decl.EarlyAttrValidation = validated;
-  }
-  
   /// Get the validation state.
   ValidationState getValidationState() const {
     return ValidationState(Bits.Decl.ValidationState);
@@ -5934,7 +5921,7 @@ class OperatorDecl;
 enum class SelfAccessKind : uint8_t {
   NonMutating,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -6037,7 +6024,7 @@ public:
     return getSelfAccessKind() == SelfAccessKind::NonMutating;
   }
   bool isConsuming() const {
-    return getSelfAccessKind() == SelfAccessKind::__Consuming;
+    return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
 
   SelfAccessKind getSelfAccessKind() const;

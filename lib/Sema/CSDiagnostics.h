@@ -237,13 +237,8 @@ public:
     assert(isConditional() || Signature);
     assert(AffectedDecl);
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -254,13 +249,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
@@ -365,45 +356,6 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
-};
-
-/// Diagnostics for mismatched generic arguments e.g
-/// ```swift
-/// struct F<G> {}
-/// let _:F<Int> = F<Bool>()
-/// ```
-class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
-  ArrayRef<unsigned> Mismatches;
-
-public:
-  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
-                                  BoundGenericType *actual,
-                                  BoundGenericType *required,
-                                  ArrayRef<unsigned> mismatches,
-                                  ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), Actual(actual),
-        Required(required), Mismatches(mismatches) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  void emitNotesForMismatches() {
-    for (unsigned position : Mismatches) {
-      emitNoteForMismatch(position);
-    }
-  }
-
-  void emitNoteForMismatch(int mismatchPosition);
-
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
-
-  /// The actual type being used.
-  BoundGenericType *getActual() const { return Actual; }
-
-  /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const { return Required; }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -663,6 +615,9 @@ public:
 
   bool diagnoseAsError() override;
 
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
+
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
@@ -673,6 +628,14 @@ public:
   /// Produce a specialized diagnostic if this is an attempt to initialize
   /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
   bool diagnoseConversionToDictionary() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
@@ -723,8 +686,6 @@ protected:
                                             Type contextualType);
 
 private:
-  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
-
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
     if (auto *BGT = type->getAs<BoundGenericType>()) {
@@ -749,8 +710,53 @@ private:
   bool isIntegerToStringIndexConversion() const;
 
 protected:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public ContextualFailure {
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  Type actualType, Type requiredType,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, actualType, requiredType, locator),
+        Mismatches(mismatches) {
+    assert(actualType->is<BoundGenericType>());
+    assert(requiredType->is<BoundGenericType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const {
+    return getFromType()->castTo<BoundGenericType>();
+  }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const {
+    return getToType()->castTo<BoundGenericType>();
+  }
 };
 
 /// Diagnose failures related to conversion between throwing function type

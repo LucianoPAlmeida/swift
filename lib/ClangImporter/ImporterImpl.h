@@ -1292,7 +1292,6 @@ public:
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
-    D->setEarlyAttrValidation(true);
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
@@ -1325,8 +1324,9 @@ public:
 
   /// Look for namespace-scope values with the given name using the
   /// DWARFImporterDelegate.
+  /// \param inModule only return results from this module.
   void lookupValueDWARF(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                        NLKind lookupKind,
+                        NLKind lookupKind, Identifier inModule,
                         SmallVectorImpl<ValueDecl *> &results);
 
   /// Look for top-level scope types with a name and kind using the
