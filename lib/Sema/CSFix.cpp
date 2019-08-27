@@ -773,3 +773,17 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
+
+bool RemoveUnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
+  // TODO: Create custom diag for that?
+  return false;
+}
+
+RemoveUnecessaryCoercion
+*RemoveUnecessaryCoercion::create(ConstraintSystem &cs,
+                                  Type fromType,
+                                  Type toType,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      RemoveUnecessaryCoercion(cs, fromType, toType, locator);
+}

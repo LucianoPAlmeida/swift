@@ -2747,9 +2747,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
-  if (desugar1->isEqual(desugar2) &&
-      !isa<InOutType>(desugar2))
-    return getTypeMatchSuccess();
+  if (desugar1->isEqual(desugar2)) {
+    if (kind == ConstraintKind::Conversion) {
+      // TODO: Create fix it or emit diagnostic?
+    }
+    if (!isa<InOutType>(desugar2))
+      return getTypeMatchSuccess();
+  }
 
   // Local function that should be used to produce the return value whenever
   // this function was unable to resolve the constraint. It should be used
@@ -2890,20 +2894,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                          formUnsolvedResult);
         }
       }
-      
-      // If we are trying to perform coercion to the same type emit a warning.
-      if (locator.getBaseLocator()->isTypeCoercion()) {
-        if (auto expr = dyn_cast<CoerceExpr>(locator.getBaseLocator()->getAnchor())) {
-          if (!shouldSuppressDiagnostics()) {
-            if (type1->getCanonicalType()->isEqual(type2->getCanonicalType())) {
-              TC.diagnose(expr->getLoc(), diag::unecessary_same_type_coercion, type2)
-                .fixItRemove(SourceRange(expr->getLoc(),
-                                         expr->getCastTypeLoc().getSourceRange().End));
-            }
-          }
-        }
-      }
-      
+
       return formUnsolvedResult();
     }
 
@@ -7363,6 +7354,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
+  case FixKind::RemoveUnecessaryCoercion:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -7616,9 +7608,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
   auto locatorPtr = getConstraintLocator(locator);
 
   // Coercion (the common case).
-  auto coercionPath = LocatorPathElt(ConstraintLocator::TypeCoercion);
-  auto coerceLocator = getConstraintLocator(locator.getBaseLocator(),
-                                            coercionPath);
+  auto coerceLocator = getConstraintLocator(locator.getBaseLocator(), LocatorPathElt::TypeCoercion());
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
                        fromType, toType, coerceLocator);

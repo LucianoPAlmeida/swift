@@ -195,6 +195,9 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+  
+  /// Remove a unecessary coercion ('as') if the types are already equal. e.g. "Hello" as String
+  RemoveUnecessaryCoercion,
 };
 
 class ConstraintFix {
@@ -1310,6 +1313,28 @@ public:
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
+};
+
+class RemoveUnecessaryCoercion : public ConstraintFix {
+  Type LHS, RHS;
+  
+protected:
+  RemoveUnecessaryCoercion(ConstraintSystem &cs, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+  : ConstraintFix(cs, FixKind::RemoveUnecessaryCoercion, locator), LHS(lhs),
+  RHS(rhs) {}
+
+  
+public:
+  std::string getName() const override { return "remove unecessary explicit type coercion"; }
+  
+  Type getFromType() const { return LHS; }
+  Type getToType() const { return RHS; }
+  
+  bool diagnose(Expr *root, bool asNote = false) const override;
+  
+  static RemoveUnecessaryCoercion *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

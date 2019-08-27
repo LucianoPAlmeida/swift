@@ -34,6 +34,7 @@ namespace swift {
 
 class Expr;
 class SourceManager;
+class CoerceExpr;
 
 namespace constraints {
   class ConstraintSystem;
@@ -367,6 +368,7 @@ public:
     class GenericParameter;
     class OpenedGeneric;
     class KeyPathDynamicMember;
+    class TypeCoercion;
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -894,6 +896,16 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
+
+class LocatorPathElt::TypeCoercion final : public LocatorPathElt {
+public:
+  TypeCoercion()
+  : LocatorPathElt(ConstraintLocator::TypeCoercion) {}
+  
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TypeCoercion;
   }
 };
 
