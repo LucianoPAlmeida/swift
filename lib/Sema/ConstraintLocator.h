@@ -471,7 +471,7 @@ public:
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
   }
-  
+
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;

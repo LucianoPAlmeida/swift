@@ -775,15 +775,16 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 }
 
 bool RemoveUnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
-  // TODO: Create custom diag for that?
-  return false;
+  auto &cs = getConstraintSystem();
+
+  UnecessaryCoecionFailure failure(cs, getToType(), getLocator());
+  return failure.diagnoseAsError();
 }
 
 RemoveUnecessaryCoercion
 *RemoveUnecessaryCoercion::create(ConstraintSystem &cs,
-                                  Type fromType,
                                   Type toType,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      RemoveUnecessaryCoercion(cs, fromType, toType, locator);
+      RemoveUnecessaryCoercion(cs, toType, locator);
 }

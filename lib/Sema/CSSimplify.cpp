@@ -2748,8 +2748,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    if (kind == ConstraintKind::Conversion) {
-      // TODO: Create fix it or emit diagnostic?
+    if (locator.getBaseLocator()->isLastElement(ConstraintLocator::PathElementKind::TypeCoercion)) {
+      auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
+                                                   locator.getBaseLocator());
+      recordFix(fix);
     }
     if (!isa<InOutType>(desugar2))
       return getTypeMatchSuccess();

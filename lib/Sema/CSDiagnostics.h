@@ -1316,11 +1316,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-//
-// ```swift
-// let keyPath = \AnyObject.bar
-// ```
+/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+///
+/// ```swift
+/// let keyPath = \AnyObject.bar
+/// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1592,6 +1592,20 @@ public:
                                               ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
 
+  bool diagnoseAsError() override;
+};
+
+class UnecessaryCoecionFailure final : public FailureDiagnostic {
+  Type toType;
+
+public:
+  UnecessaryCoecionFailure(ConstraintSystem &cs,
+                           Type toType,
+                           ConstraintLocator *locator)
+  : FailureDiagnostic(locator->getAnchor(), cs, locator), toType(toType) {}
+  
+  Type getToType() { return toType; }
+  
   bool diagnoseAsError() override;
 };
 
