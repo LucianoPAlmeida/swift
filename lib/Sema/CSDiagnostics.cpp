@@ -4337,7 +4337,7 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 
 bool UnecessaryCoecionFailure::diagnoseAsError() {
   auto expr = dyn_cast<CoerceExpr>(getAnchor());
-  
+
   emitDiagnostic(expr->getLoc(), diag::unecessary_same_type_coercion, getToType())
       .fixItRemove(SourceRange(expr->getLoc(),
                                expr->getCastTypeLoc().getSourceRange().End));
