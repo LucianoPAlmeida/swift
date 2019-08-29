@@ -1333,6 +1333,27 @@ public:
   
   static RemoveUnecessaryCoercion *create(ConstraintSystem &cs, Type toType,
                                           ConstraintLocator *locator);
+
+};
+
+/// If this is an argument-to-parameter conversion which is associated with
+/// `inout` parameter, subtyping is now permitted, types have to
+/// be identical.
+class AllowInOutConversion final : public ContextualMismatch {
+  AllowInOutConversion(ConstraintSystem &cs, Type argType, Type paramType,
+                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow conversions between argument/parameter marked as `inout`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInOutConversion *create(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator);
 };
 
 } // end namespace constraints

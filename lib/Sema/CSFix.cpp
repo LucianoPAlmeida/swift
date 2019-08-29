@@ -788,3 +788,17 @@ RemoveUnecessaryCoercion
   return new (cs.getAllocator())
       RemoveUnecessaryCoercion(cs, toType, locator);
 }
+
+bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InOutConversionFailure failure(root, cs, getFromType(), getToType(),
+                                 getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
+                                                   Type argType, Type paramType,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInOutConversion(cs, argType, paramType, locator);
+}

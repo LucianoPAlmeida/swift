@@ -20,8 +20,10 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -472,6 +474,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
+  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
@@ -978,7 +981,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
-    removeShadowedDecls(CurModuleResults, &M);
+    removeShadowedDecls(CurModuleResults, dc);
   }
 
   for (auto VD : CurModuleResults) {
@@ -1019,17 +1022,14 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
-    forAllVisibleModules(
-        dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
-          if (import.second == desiredModule) {
-            Results.push_back(LookupResultEntry(import.second));
+    // Make sure the desired module is actually visible from the current
+    // context.
+    if (Ctx.getImportCache().isImportedBy(desiredModule, dc)) {
+      Results.push_back(LookupResultEntry(desiredModule));
 #ifndef NDEBUG
-            addedResult(Results.back());
+      addedResult(Results.back());
 #endif
-            return false;
-          }
-          return true;
-        });
+    }
   }
 }
 

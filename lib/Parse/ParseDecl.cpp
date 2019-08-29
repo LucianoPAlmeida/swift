@@ -2706,6 +2706,8 @@ bool Parser::isStartOfDecl() {
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.setDiscard();
   SourceLoc CurrentLoc = Tok.getLoc();
 
   SourceLoc EndLoc = PreviousLoc;
@@ -3087,7 +3089,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
                  nominal->getName());
       } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
-        if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+        if (auto repr = extension->getExtendedTypeRepr()) {
           if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
             diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
                      idRepr->getComponentRange().front()->getIdentifier());
@@ -3147,7 +3149,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
       !CurDeclContext->isModuleScopeContext() &&
-      !isa<TopLevelCodeDecl>(CurDeclContext)) {
+      !isa<TopLevelCodeDecl>(CurDeclContext) &&
+      !isa<AbstractClosureExpr>(CurDeclContext)) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
@@ -5803,24 +5806,32 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
 
       // For recovery, see if the user typed something resembling a switch
       // "case" label.
-      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
-      parseMatchingPattern(/*isExprBasic*/false);
-
-      if (consumeIf(tok::colon)) {
-        diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-        Status.setIsParseError();
-        return Status;
+      {
+        BacktrackingScope backtrack(*this);
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+        parseMatchingPattern(/*isExprBasic*/false);
+        
+        if (consumeIf(tok::colon)) {
+          backtrack.cancelBacktrack();
+          diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+          Status.setIsParseError();
+          return Status;
+        }
       }
-      if (CommaLoc.isValid()) {
-        diagnose(Tok, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
-      }
+      
       if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+        if (!Tok.isAtStartOfLine()) {
+          Name = Context.getIdentifier(Tok.getText());
+          NameLoc = consumeToken();
+        }
+      } else if (CommaLoc.isValid()) {
+        diagnose(Tok, diag::expected_identifier_after_case_comma);
+        Status.setIsParseError();
+        return Status;
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
