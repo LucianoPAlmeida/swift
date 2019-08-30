@@ -7767,7 +7767,16 @@ void ConstraintSystem::addExplicitConversionConstraint(
   auto locatorPtr = getConstraintLocator(locator);
 
   // Coercion (the common case).
-  auto coerceLocator = getConstraintLocator(locator.getBaseLocator(), LocatorPathElt::TypeCoercion());
+  auto coerceLocator = [&]() {
+    if (auto expr = dyn_cast<CoerceExpr>(locatorPtr->getAnchor())) {
+      // Only adding this path for explicty coercions e.g _ = a as Int
+      // and for non lireal subExpr.
+      if (!expr->isImplicit() && !isa<LiteralExpr>(expr->getSubExpr()))
+        return getConstraintLocator(locator.getBaseLocator(), LocatorPathElt::TypeCoercion());
+    }
+    return locatorPtr;
+  }();
+  
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
                        fromType, toType, coerceLocator);

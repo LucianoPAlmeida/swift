@@ -150,3 +150,6 @@ _ = sr11295c as String // expected-warning {{casting expression to 'String' does
 
 let sr11295d = "Hello Typealias"
 _ = sr11295d as Type // expected-warning {{casting expression to 'Type' (aka 'String') doesn't change the type}} {{14-22=}}
+
+_ = "Hello" as String // Ok
+_ = 1 as Int64 // Ok
