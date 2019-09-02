@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -364,10 +365,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC);
 
-  CurrDC->getParentSourceFile()->forAllVisibleModules(
-      [&](ModuleDecl::ImportedModule Import) {
-        Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
-      });
+  for (auto Import : namelookup::getAllImports(CurrDC)) {
+    Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+  }
 }
 
 namespace {
@@ -1018,7 +1018,6 @@ static void lookupVisibleMemberDecls(
 static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
                                    const DeclContext *DC,
                                    bool IncludeTopLevel, SourceLoc Loc) {
-  const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
   auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
 
@@ -1055,7 +1054,10 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, AFD->getBody() check can be removed.
-      if (Loc.isValid() && AFD->getBody()) {
+      if (Loc.isValid() &&
+          AFD->getSourceRange().isValid() &&
+          SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc) &&
+          AFD->getBody()) {
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
@@ -1121,7 +1123,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -1137,22 +1138,16 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
           Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
         return;
       }
-
-      ModuleDecl::ImportFilter importFilter;
-      importFilter |= ModuleDecl::ImportFilterKind::Private;
-      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-      SF->getImportedModules(extraImports, importFilter);
     }
   }
 
   if (IncludeTopLevel) {
     using namespace namelookup;
     SmallVector<ValueDecl *, 0> moduleResults;
-    auto &mutableM = const_cast<ModuleDecl&>(M);
-    lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
+    lookupVisibleDeclsInModule(DC, {}, moduleResults,
                                NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,
-                               DC, extraImports);
+                               DC);
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 

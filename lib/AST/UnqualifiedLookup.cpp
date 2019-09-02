@@ -663,7 +663,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
   const bool isCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
       (isCascadingUseArg.getValueOr(
-          Loc.isInvalid() || !AFD->getBody() ||
+          Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
           !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
   if (AFD->getDeclContext()->isTypeContext())
@@ -814,7 +814,9 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
   // FIXME: when we can parse and typecheck the function body partially
   // for code completion, AFD->getBody() check can be removed.
 
-  if (Loc.isInvalid() || !AFD->getBody()) {
+  if (Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
+      !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) ||
+      !AFD->getBody()) {
     return;
   }
 
@@ -963,21 +965,12 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
-  // Add private imports to the extra search list.
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    FU->getImportedModules(extraImports, importFilter);
-  }
-
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, dc, extraImports);
+  lookupInModule(dc, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                 resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {

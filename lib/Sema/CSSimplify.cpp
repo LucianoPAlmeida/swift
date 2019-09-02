@@ -973,36 +973,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
-    // If a parameter is unfulfilled, validate the default argument if it is a
-    // magic literal expression.
-    if (parameterBindings[paramIdx].empty()) {
-      if (!callee)
-        continue;
-
-      if (!callee->hasParameterList())
-        continue;
-
-      auto param = getParameterAt(callee, paramIdx);
-
-      auto defaultValueExpr = param->getDefaultValue();
-
-      if (!(defaultValueExpr &&
-            isa<MagicIdentifierLiteralExpr>(defaultValueExpr)))
-        continue;
-
-      if (defaultValueExpr->getType())
-        continue;
-
-      cs.generateConstraints(defaultValueExpr, param->getDeclContext());
-
-      auto defaultTy = cs.getType(defaultValueExpr);
-      auto paramTy = param->getType();
-      cs.addConstraint(
-          ConstraintKind::ArgumentConversion, defaultTy, paramTy,
-          locator.withPathElement(ConstraintLocator::DefaultArgument));
-
+    // Skip unfulfilled parameters. There's nothing to do for them.
+    if (parameterBindings[paramIdx].empty())
       continue;
-    }
 
     // Determine the parameter type.
     const auto &param = params[paramIdx];
@@ -1924,6 +1897,10 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           // with overloaded declarations.
           if (last->getKind() == ConstraintLocator::ApplyArgToParam)
             return getTypeMatchFailure(locator);
+        } else { // There are no elements in the path
+          auto *anchor = locator.getAnchor();
+          if (!(anchor && isa<AssignExpr>(anchor)))
+            return getTypeMatchFailure(locator);
         }
 
         auto *fix = MissingConformance::forContextual(
@@ -2621,12 +2598,6 @@ bool ConstraintSystem::repairFailures(
           *this, fnType, {FunctionType::Param(*arg)},
           getConstraintLocator(anchor, path)));
     }
-    break;
-  }
-
-  case ConstraintLocator::DefaultArgument: {
-    conversionsOrFixes.push_back(IgnoreDefaultArgumentTypeMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(anchor, path)));
     break;
   }
 
@@ -3839,8 +3810,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+  auto *typeVar = type->getAs<TypeVariableType>();
   if (shouldAttemptFixes()) {
-    auto *typeVar = type->getAs<TypeVariableType>();
     // If type variable, associated with this conformance check,
     // has been determined to be a "hole" in constraint system,
     // let's consider this check a success without recording
@@ -3990,6 +3961,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Error;
 
     if (path.back().is<LocatorPathElt::AnyRequirement>()) {
+      // If this is a requirement associated with `Self` which is bound
+      // to `Any`, let's consider this "too incorrect" to continue.
+      //
+      // This helps us to filter out cases like operator overloads where
+      // `Self` type comes from e.g. default for collection element -
+      // `[1, "hello"].map { $0 + 1 }`. Main problem here is that
+      // collection type couldn't be determined without unification to
+      // `Any` and `+` failing for all numeric overloads is just a consequence.
+      if (typeVar && type->isAny()) {
+        auto *GP = typeVar->getImpl().getGenericParameter();
+        if (auto *GPD = GP->getDecl()) {
+          auto *DC = GPD->getDeclContext();
+          if (DC->isTypeContext() && DC->getSelfInterfaceType()->isEqual(GP))
+            return SolutionKind::Error;
+        }
+      }
+
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
         if (!recordFix(fix)) {
@@ -7468,7 +7456,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::AddMissingArguments:
-  case FixKind::DefaultArgumentTypeMismatch:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {

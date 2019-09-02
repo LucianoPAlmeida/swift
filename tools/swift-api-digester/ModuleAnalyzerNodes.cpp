@@ -586,8 +586,8 @@ static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
 SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                                    llvm::yaml::MappingNode *Node) {
   static auto GetScalarString = [&](llvm::yaml::Node *N) -> StringRef {
-    auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
-    return WithQuote.substr(1, WithQuote.size() - 2);
+    SmallString<64> Buffer;
+    return Ctx.buffer(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
   };
 
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
@@ -1278,6 +1278,24 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
   }
 }
 
+static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
+  std::vector<DeclAttrKind> Results;
+  for (auto *Attr: D->getAttrs())
+    Results.push_back(Attr->getKind());
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+#define HANDLE(COND, KIND_NAME)                                                                   \
+    if (VD->COND && !llvm::is_contained(Results, DeclAttrKind::KIND_NAME))                        \
+      Results.emplace_back(DeclAttrKind::KIND_NAME);
+    // These attributes may be semantically applicable to the current decl but absent from
+    // the actual AST. Populting them to the nodes ensure we don't have false positives.
+    HANDLE(isObjC(), DAK_ObjC)
+    HANDLE(isFinal(), DAK_Final)
+    HANDLE(isDynamic(), DAK_Dynamic)
+#undef HANDLE
+  }
+  return Results;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()),
       Location(calculateLocation(Ctx, D)),
@@ -1294,22 +1312,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       ObjCName(Ctx.getObjcName(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
-      IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
-
-  // Force some attributes that are lazily computed.
-  // FIXME: we should use these AST predicates directly instead of looking at
-  // the attributes rdar://50217247.
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    (void) VD->isObjC();
-    (void) VD->isFinal();
-    (void) VD->isDynamic();
-  }
-
-  // Capture all attributes.
-  auto AllAttrs = D->getAttrs();
-  std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
-                 [](DeclAttribute *attr) { return attr->getKind(); });
-}
+      IsABIPlaceholder(isABIPlaceholderRecursive(D)),
+      DeclAttrs(collectDeclAttributes(D)) {}
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
     SDKNodeInitInfo(Ctx, cast<Decl>(OD)) {
@@ -2098,7 +2102,6 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 // previously dumped.
 void SwiftDeclCollector::deSerialize(StringRef Filename) {
   auto Pair = parseJsonEmit(Ctx, Filename);
-  OwnedBuffers.push_back(std::move(Pair.first));
   RootNode = std::move(Pair.second);
 }
 

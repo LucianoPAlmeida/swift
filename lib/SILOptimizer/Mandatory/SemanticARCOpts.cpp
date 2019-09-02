@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -38,11 +39,12 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-/// Return true if v only has invalidating uses that are destroy_value.
+/// Return true if v only has invalidating uses that are destroy_value. Such an
+/// owned value is said to represent a dead "live range".
 ///
 /// Semantically this implies that a value is never passed off as +1 to memory
 /// or another function implying it can be used everywhere at +0.
-static bool isConsumed(
+static bool isDeadLiveRange(
     SILValue v, SmallVectorImpl<DestroyValueInst *> &destroys,
     NullablePtr<SmallVectorImpl<SILInstruction *>> forwardingInsts = nullptr) {
   assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
@@ -72,8 +74,9 @@ static bool isConsumed(
       }
 
       // Otherwise, see if we have a forwarding value that has a single
-      // non-trivial operand that can accept a guaranteed value. If so, at its
-      // users to the worklist and continue.
+      // non-trivial operand that can accept a guaranteed value. If not, we can
+      // not recursively process it, so be conservative and assume that we /may
+      // consume/ the value, so the live range must not be eliminated.
       //
       // DISCUSSION: For now we do not support forwarding instructions with
       // multiple non-trivial arguments since we would need to optimize all of
@@ -81,25 +84,27 @@ static bool isConsumed(
       //
       // NOTE: Today we do not support TermInsts for simplicity... we /could/
       // support it though if we need to.
-      if (forwardingInsts.isNonNull() && !isa<TermInst>(user) &&
-          isGuaranteedForwardingInst(user) &&
-          1 == count_if(user->getOperandValues(
+      if (forwardingInsts.isNull() || isa<TermInst>(user) ||
+          !isGuaranteedForwardingInst(user) ||
+          1 != count_if(user->getOperandValues(
                             true /*ignore type dependent operands*/),
                         [&](SILValue v) {
                           return v.getOwnershipKind() ==
                                  ValueOwnershipKind::Owned;
                         })) {
-        forwardingInsts.get()->push_back(user);
-        for (SILValue v : user->getResults()) {
-          if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
-            continue;
-          llvm::copy(v->getUses(), std::back_inserter(worklist));
-        }
-        continue;
+        return false;
       }
 
-      // Otherwise be conservative and assume that we /may consume/ the value.
-      return true;
+      // Ok, this is a forwarding instruction whose ownership we can flip from
+      // owned -> guaranteed. Visit its users recursively to see if the the
+      // users force the live range to be alive.
+      forwardingInsts.get()->push_back(user);
+      for (SILValue v : user->getResults()) {
+        if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+          continue;
+        llvm::copy(v->getUses(), std::back_inserter(worklist));
+      }
+      continue;
     }
     case UseLifetimeConstraint::MustBeLive:
       // Ok, this constraint can take something owned as live. Assert that it
@@ -113,7 +118,9 @@ static bool isConsumed(
     }
   }
 
-  return false;
+  // We visited all of our users and were able to prove that all of them were
+  // benign. Return true.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,7 +145,7 @@ namespace {
 /// the worklist before we delete them.
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
-  SmallSetVector<SILValue, 32> worklist;
+  SmallBlotSetVector<SILValue, 32> worklist;
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
   
@@ -175,7 +182,7 @@ struct SemanticARCOptVisitor
     // Remove all SILValues of the instruction from the worklist and then erase
     // the instruction.
     for (SILValue result : i->getResults()) {
-      worklist.remove(result);
+      worklist.erase(result);
     }
     i->eraseFromParent();
   }
@@ -185,7 +192,7 @@ struct SemanticARCOptVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
-      
+
   bool isWrittenTo(LoadInst *li);
 
   bool processWorklist();
@@ -205,7 +212,11 @@ bool SemanticARCOptVisitor::processWorklist() {
   bool madeChange = false;
 
   while (!worklist.empty()) {
-    SILValue next = worklist.pop_back_val();
+    // Pop the last element off the list. If we were returned None, we blotted
+    // this element, so skip it.
+    SILValue next = worklist.pop_back_val().getValueOr(SILValue());
+    if (!next)
+      continue;
 
     // First check if this is an instruction that is trivially dead. This can
     // occur if we eliminate rr traffic resulting in dead projections and the
@@ -224,7 +235,7 @@ bool SemanticARCOptVisitor::processWorklist() {
                 worklist.insert(operand);
               }
               for (SILValue result : i->getResults()) {
-                worklist.remove(result);
+                worklist.erase(result);
               }
               ++NumEliminatedInsts;
             });
@@ -327,18 +338,71 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
     return false;
 
-  // Then go over all of our uses. Find our destroying instructions (ignoring
-  // forwarding instructions that can forward both owned and guaranteed) and
-  // make sure all of them are destroy_value. For our non-destroying
-  // instructions, make sure that they accept a guaranteed value. After that,
-  // make sure that our destroys are within the lifetime of our borrowed values.
-  //
-  // TODO: Change isConsumed to return branch propagated users for destroys, so
-  // we do not need to construct another array.
+  // Then go over all of our uses and see if the value returned by our copy
+  // value forms a dead live range. If we do not have a dead live range, there
+  // must be some consuming use that we either do not understand is /actually/
+  // forwarding or a user that truly represents a necessary consume of the
+  // value (e.x. storing into memory).
   SmallVector<DestroyValueInst *, 16> destroys;
   SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
-  if (isConsumed(cvi, destroys, &guaranteedForwardingInsts))
+  if (!isDeadLiveRange(cvi, destroys, &guaranteedForwardingInsts))
     return false;
+
+  // Next check if we have any destroys at all of our copy_value and an operand
+  // that is not a function argument. Otherwise, due to the way we ignore dead
+  // end blocks, we may eliminate the copy_value, creating a use of the borrowed
+  // value after the end_borrow.
+  //
+  // DISCUSSION: Consider the following SIL:
+  //
+  // ```
+  //   %1 = begin_borrow %0 : $KlassPair                            (1)
+  //   %2 = struct_extract %1 : $KlassPair, #KlassPair.firstKlass
+  //   %3 = copy_value %2 : $Klass
+  //   ...
+  //   end_borrow %1 : $LintCommand                                 (2)
+  //   cond_br ..., bb1, bb2
+  //
+  //   ...
+  //
+  //   bbN:
+  //     // Never return type implies dead end block.
+  //     apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> Never (3)
+  //     unreachable
+  // ```
+  //
+  // For simplicity, note that if bbN post-dominates %3, given that when we
+  // compute linear lifetime errors we ignore dead end blocks, we would not
+  // register that the copy_values only use is outside of the begin_borrow
+  // region defined by (1), (2) and thus would eliminate the copy. This would
+  // result in %2 being used by %f, causing the linear lifetime checker to
+  // error.
+  //
+  // Naively one may assume that the solution to this is to just check if %3 has
+  // /any/ destroy_values at all and if it doesn't have any reachable
+  // destroy_values, then we are in this case. But is this correct in
+  // general. We prove this below:
+  //
+  // The only paths along which the copy_value can not be destroyed or consumed
+  // is along paths to dead end blocks. Trivially, we know that such a dead end
+  // block, can not be reachable from the end_borrow since by their nature dead
+  // end blocks end in unreachables.
+  //
+  // So we know that we can only run into this bug if we have a dead end block
+  // reachable from the end_borrow, meaning that the bug can not occur if we
+  // branch before the end_borrow since in that case, the borrow scope would
+  // last over the dead end block's no return meaning that we will not use the
+  // borrowed value after its lifetime is ended by the end_borrow.
+  //
+  // With that in hand, we note again that if we have exactly one consumed,
+  // destroy_value /after/ the end_borrow we will not optimize here. This means
+  // that this bug can only occur if the copy_value is only post-dominated by
+  // dead end blocks that use the value in a non-consuming way.
+  if (destroys.empty() && llvm::any_of(borrowIntroducers, [](SILValue v) {
+        return !isa<SILFunctionArgument>(v);
+      })) {
+    return false;
+  }
 
   // If we reached this point, then we know that all of our users can
   // accept a guaranteed value and our owned value is destroyed only
@@ -514,64 +578,93 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
   return true;
 }
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
-  auto addr = load->getOperand();
+// Then find our accessed storage to determine whether it provides a guarantee
+// for the loaded value.
+namespace {
+class StorageGuaranteesLoadVisitor
+  : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
+{
+  // The outer SemanticARCOptVisitor.
+  SemanticARCOptVisitor &ARCOpt;
   
-  // Then find our accessed storage. If we can not find anything, be
-  // conservative and assume that the value is written to.
-  const auto &storage = findAccessedStorageNonNested(addr);
-  if (!storage)
-    return true;
-
-  // Then see if we ever write to this address in a flow insensitive
-  // way (ignoring stores that are obviously the only initializer to
-  // memory). We have to do this since load_borrow assumes that the
-  // underlying memory is never written to.
-  switch (storage.getKind()) {
-  case AccessedStorage::Class: {
+  // The original load instruction.
+  LoadInst *Load;
+  
+  // The current address being visited.
+  SILValue currentAddress;
+  
+  Optional<bool> isWritten;
+  
+public:
+  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load)
+    : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand())
+  {}
+  
+  void answer(bool written) {
+    currentAddress = nullptr;
+    isWritten = written;
+  }
+  
+  void next(SILValue address) {
+    currentAddress = address;
+  }
+  
+  void visitNestedAccess(BeginAccessInst *access) {
+    // Look through nested accesses.
+    return next(access->getOperand());
+  }
+  
+  void visitArgumentAccess(SILFunctionArgument *arg) {
+    return answer(mayFunctionMutateArgument(
+                             AccessedStorage(arg, AccessedStorage::Argument),
+                             ARCOpt.F));
+  }
+  
+  void visitGlobalAccess(SILValue global) {
+    return answer(!AccessedStorage(global, AccessedStorage::Global)
+                    .isLetAccess(&ARCOpt.F));
+  }
+  
+  void visitClassAccess(RefElementAddrInst *field) {
+    currentAddress = nullptr;
+    
     // We know a let property won't be written to if the base object is
     // guaranteed for the duration of the access.
-    if (!storage.isLetAccess(&F))
-      return true;
-   
-    auto baseObject = stripCasts(storage.getObject());
+    // For non-let properties conservatively assume they may be written to.
+    if (!field->getField()->isLet()) {
+      return answer(true);
+    }
+    
+    // The lifetime of the `let` is guaranteed if it's dominated by the
+    // guarantee on the base. Check for a borrow.
+    SILValue baseObject = field->getOperand();
+    auto beginBorrow = dyn_cast<BeginBorrowInst>(baseObject);
+    if (beginBorrow)
+      baseObject = beginBorrow->getOperand();
+    baseObject = stripCasts(baseObject);
+
     // A guaranteed argument trivially keeps the base alive for the duration of
     // the projection.
     if (auto *arg = dyn_cast<SILFunctionArgument>(baseObject)) {
       if (arg->getArgumentConvention().isGuaranteedConvention()) {
-        return false;
+        return answer(false);
       }
     }
     
     // See if there's a borrow of the base object our load is based on.
     SILValue borrowInst;
-    if (isa<BeginBorrowInst>(baseObject)
-        || isa<LoadBorrowInst>(baseObject)) {
+    if (isa<LoadBorrowInst>(baseObject)) {
       borrowInst = baseObject;
     } else {
-      // TODO: We should walk the projection path again to get to the
-      // originating borrow, if any
-      
-      BeginBorrowInst *singleBorrow = nullptr;
-      for (auto *use : baseObject->getUses()) {
-        if (auto *borrow = dyn_cast<BeginBorrowInst>(use->getUser())) {
-          if (!singleBorrow) {
-            singleBorrow = borrow;
-          } else {
-            singleBorrow = nullptr;
-            break;
-          }
-        }
-      }
-      
-      borrowInst = singleBorrow;
+      borrowInst = beginBorrow;
     }
-    
+    // TODO: We could also look at a guaranteed phi argument and see whether
+    // the loaded copy is dominated by it.
+    if (!borrowInst)
+      return answer(true);
+
     // Use the linear lifetime checker to check whether the copied
     // value is dominated by the lifetime of the borrow it's based on.
-    if (!borrowInst)
-      return true;
-    
     SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
     for (auto *use : borrowInst->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
@@ -580,7 +673,7 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
     }
     
     SmallVector<BranchPropagatedUser, 4> valueDestroys;
-    for (auto *use : load->getUses()) {
+    for (auto *use : Load->getUses()) {
       if (isa<DestroyValueInst>(use->getUser())) {
         valueDestroys.push_back(BranchPropagatedUser(use->getUser()));
       }
@@ -588,28 +681,44 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
     
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     
-    return valueHasLinearLifetime(baseObject, baseEndBorrows, valueDestroys,
-                                  visitedBlocks, getDeadEndBlocks(),
-                                  ownership::ErrorBehaviorKind::ReturnFalse)
-      .getFoundError();
+    auto result = valueHasLinearLifetime(baseObject, baseEndBorrows,
+                                   valueDestroys, visitedBlocks,
+                                   ARCOpt.getDeadEndBlocks(),
+                                   ownership::ErrorBehaviorKind::ReturnFalse);
+    return answer(result.getFoundError());
   }
-  case AccessedStorage::Global:
-    // Any legal load of a global let should have happened after its
-    // initialization, at which point it can't be written to again for the
-    // lifetime of the program.
-    return !storage.isLetAccess(&F);
+  
+  // TODO: Handle other access kinds?
+  void visitBase(SILValue base, AccessedStorage::Kind kind) {
+    return answer(true);
+  }
 
-  case AccessedStorage::Box:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Yield:
-  case AccessedStorage::Nested:
-  case AccessedStorage::Unidentified:
-    return true;
-      
-  case AccessedStorage::Argument:
-    return mayFunctionMutateArgument(storage, F);
+  void visitNonAccess(SILValue addr) {
+    return answer(true);
   }
-  llvm_unreachable("covered switch");
+  
+  void visitIncomplete(SILValue projectedAddr, SILValue parentAddr) {
+    return next(parentAddr);
+  }
+  
+  void visitPhi(SILPhiArgument *phi) {
+    // We shouldn't have address phis in OSSA SIL, so we don't need to recur
+    // through the predecessors here.
+    return answer(true);
+  }
+
+  bool doIt() {
+    while (currentAddress) {
+      visit(currentAddress);
+    }
+    return *isWritten;
+  }
+};
+} // namespace
+
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
+  StorageGuaranteesLoadVisitor visitor(*this, load);
+  return visitor.doIt();
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can
@@ -618,15 +727,15 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
-  // Ok, we have our load [copy]. Make sure its value is never
-  // consumed. If it is consumed, we need to pass off a +1 value, so
-  // bail.
+  // Ok, we have our load [copy]. Make sure its value is truly a dead live range
+  // implying it is only ever consumed by destroy_value instructions. If it is
+  // consumed, we need to pass off a +1 value, so bail.
   //
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
   SmallVector<DestroyValueInst *, 32> destroyValues;
-  if (isConsumed(li, destroyValues))
+  if (!isDeadLiveRange(li, destroyValues))
     return false;
 
   // Then check if our address is ever written to. If it is, then we

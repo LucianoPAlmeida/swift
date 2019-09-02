@@ -209,11 +209,9 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
   }
 
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
-  while (Result->isSuccess() || !Result->getUnknownNodes().empty()) {
-    auto PrevType = Result->isSuccess()
-                        ? Result->getResult()
-                        : ParsedSyntaxRecorder::makeUnknownType(
-                              Result->getUnknownNodes(), *SyntaxContext);
+  while (Result->isSuccess()) {
+    auto PrevType = Result->getResult();
+
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type") ||
          peekToken().isContextualKeyword("Protocol"))) {
@@ -236,9 +234,6 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
         continue;
       }
     }
-    if (!Result->isSuccess())
-      Result =
-          makeParsedResult<ParsedTypeSyntax>({PrevType}, Result->getStatus());
     break;
   }
 
@@ -391,6 +386,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
+    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     // Handle type-function if we have an arrow.
     auto ArrowLoc = Tok.getLoc();
     auto Arrow = consumeTokenSyntax();
@@ -403,10 +399,14 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
+    auto SecondTy = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (SecondHalf.isParseError()) {
+      SyntaxContext->addSyntax(InputNode);
       if (Throws)
         SyntaxContext->addSyntax(*Throws);
       SyntaxContext->addSyntax(Arrow);
+      if (SecondTy)
+        SyntaxContext->addSyntax(*SecondTy);
       if (SecondHalf.hasCodeCompletion())
         return makeParserCodeCompletionResult<TypeRepr>();
       if (SecondHalf.isNull())
@@ -414,12 +414,6 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     }
 
     ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
-    Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
-    Builder.useArrow(Arrow);
-    if (Throws)
-      Builder.useThrowsOrRethrowsKeyword(*Throws);
-
-    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     bool isVoid = false;
     if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
       // Decompose TupleTypeSyntax and repack into FunctionType.
@@ -447,6 +441,13 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
           InputNode, /*TrailingComma=*/None, *SyntaxContext));
     }
+
+    Builder.useReturnType(*SecondTy);
+    if (Throws)
+      Builder.useThrowsOrRethrowsKeyword(*Throws);
+    Builder.useArrow(Arrow);
+    Builder.useReturnType(*SecondTy);
+
     SyntaxContext->addSyntax(Builder.build());
 
     auto FunctionType = SyntaxContext->topNode<FunctionTypeSyntax>();
@@ -669,19 +670,19 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
       if (startsWithLess(Tok)) {
         SmallVector<TypeRepr *, 4> GenericArgsAST;
         SourceLoc LAngleLoc, RAngleLoc;
-        auto GenericArgsResult =
-            parseGenericArgumentsAST(GenericArgsAST, LAngleLoc, RAngleLoc);
+        auto GenericArgsResult = parseGenericArgumentClauseSyntax();
         if (!GenericArgsResult.isSuccess()) {
           if (Base)
             Junk.push_back(*Base);
           if (Period)
             Junk.push_back(*Period);
           Junk.push_back(*Identifier);
-          if (auto GenericJunk = SyntaxContext->popIf<ParsedSyntax>())
-            Junk.push_back(*GenericJunk);
-          return makeParsedResult<ParsedTypeSyntax>(Junk, GenericArgsResult);
+          auto genericJunks = GenericArgsResult.getUnknownNodes();
+          Junk.append(genericJunks.begin(), genericJunks.end());
+          return makeParsedResult<ParsedTypeSyntax>(
+              Junk, GenericArgsResult.getStatus());
         }
-        GenericArgs = SyntaxContext->popIf<ParsedGenericArgumentClauseSyntax>();
+        GenericArgs = GenericArgsResult.getResult();
       }
 
       if (!Base)
@@ -1074,15 +1075,18 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       // Consume a name.
       NameLoc = Tok.getLoc();
       Name = consumeArgumentLabelSyntax();
+      LocalJunk.push_back(*Name);
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel()) {
         SecondNameLoc = Tok.getLoc();
         SecondName = consumeArgumentLabelSyntax();
+        LocalJunk.push_back(*SecondName);
       }
 
       // Consume the ':'.
       if ((Colon = consumeTokenSyntaxIf(tok::colon))) {
+        LocalJunk.push_back(*Colon);
         // If we succeed, then we successfully parsed a label.
         if (Backtracking)
           Backtracking->cancelBacktrack();
@@ -1091,8 +1095,6 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       } else {
         if (!Backtracking)
           diagnose(Tok, diag::expected_parameter_colon);
-        Name = None;
-        SecondName = None;
         NameLoc = SourceLoc();
         SecondNameLoc = SourceLoc();
       }
@@ -1103,30 +1105,23 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
 
     Backtracking.reset();
 
-    if (Name)
-      LocalJunk.push_back(*Name);
-    if (SecondName)
-      LocalJunk.push_back(*SecondName);
-    if (Colon)
-      LocalJunk.push_back(*Colon);
-
     // Parse the type annotation.
     auto TypeLoc = Tok.getLoc();
     auto TypeASTResult = parseType(diag::expected_type);
+    auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (TypeASTResult.hasCodeCompletion() || TypeASTResult.isNull()) {
+      Junk.append(LocalJunk.begin(), LocalJunk.end());
+      if (Type)
+        Junk.push_back(*Type);
       skipListUntilDeclRBraceSyntax(Junk, LParenLoc, tok::r_paren, tok::comma);
-      for (auto &&Item : LocalJunk)
-        Junk.push_back(Item);
       return TypeASTResult.hasCodeCompletion()
                  ? makeParserCodeCompletionStatus()
                  : makeParserError();
     }
 
-    auto Type = *SyntaxContext->popIf<ParsedTypeSyntax>();
-
     if (IsInOutObsoleted) {
       bool IsTypeAlreadyAttributed = false;
-      if (auto AttributedType = Type.getAs<ParsedAttributedTypeSyntax>())
+      if (auto AttributedType = Type->getAs<ParsedAttributedTypeSyntax>())
         IsTypeAlreadyAttributed = AttributedType->getDeferredSpecifier().hasValue();
 
       if (IsTypeAlreadyAttributed) {
@@ -1172,7 +1167,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     Comma = consumeTokenSyntaxIf(tok::comma);
 
     auto Element = ParsedSyntaxRecorder::makeTupleTypeElement(
-        InOut, Name, SecondName, Colon, Type, ElementEllipsis, Initializer,
+        InOut, Name, SecondName, Colon, *Type, ElementEllipsis, Initializer,
         Comma, *SyntaxContext);
 
     Junk.push_back(Element);
