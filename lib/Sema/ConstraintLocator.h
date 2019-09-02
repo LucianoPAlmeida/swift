@@ -140,8 +140,8 @@ public:
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
-    /// A type coercion
-    TypeCoercion,
+    /// A explicity type coercion
+    ExplicityTypeCoercion,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -176,7 +176,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case TypeCoercion:
+    case ExplicityTypeCoercion:
       return 0;
 
     case ContextualType:
@@ -248,7 +248,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case TypeCoercion:
+    case ExplicityTypeCoercion:
       return 0;
 
     case FunctionArgument:
@@ -368,7 +368,7 @@ public:
     class GenericParameter;
     class OpenedGeneric;
     class KeyPathDynamicMember;
-    class TypeCoercion;
+    class ExplicitTypeCoercion;
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -899,13 +899,13 @@ public:
   }
 };
 
-class LocatorPathElt::TypeCoercion final : public LocatorPathElt {
+class LocatorPathElt::ExplicitTypeCoercion final : public LocatorPathElt {
 public:
-  TypeCoercion()
-  : LocatorPathElt(ConstraintLocator::TypeCoercion) {}
+  ExplicitTypeCoercion()
+  : LocatorPathElt(ConstraintLocator::ExplicityTypeCoercion) {}
   
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::TypeCoercion;
+    return elt->getKind() == ConstraintLocator::ExplicityTypeCoercion;
   }
 };
 

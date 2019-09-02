@@ -2836,7 +2836,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    if (locator.getBaseLocator()->isLastElement(ConstraintLocator::PathElementKind::TypeCoercion)) {
+    if (locator.getBaseLocator()->isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
       auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
                                                    locator.getBaseLocator());
       recordFix(fix);
@@ -7768,11 +7768,13 @@ void ConstraintSystem::addExplicitConversionConstraint(
 
   // Coercion (the common case).
   auto coerceLocator = [&]() {
-    if (auto expr = dyn_cast<CoerceExpr>(locatorPtr->getAnchor())) {
+    if (auto expr = dyn_cast_or_null<CoerceExpr>(locatorPtr->getAnchor())) {
       // Only adding this path for explicty coercions e.g _ = a as Int
       // and for non lireal subExpr.
-      if (!expr->isImplicit() && !isa<LiteralExpr>(expr->getSubExpr()))
-        return getConstraintLocator(locator.getBaseLocator(), LocatorPathElt::TypeCoercion());
+      if (!expr->isImplicit()
+          && !isa<LiteralExpr>(expr->getSubExpr())
+          && !isa<CollectionExpr>(expr->getSubExpr()))
+        return getConstraintLocator(locator.getBaseLocator(), LocatorPathElt::ExplicitTypeCoercion());
     }
     return locatorPtr;
   }();
