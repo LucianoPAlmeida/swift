@@ -139,8 +139,6 @@ public:
     KeyPathComponentResult,
     /// A explicity type coercion
     ExplicityTypeCoercion,
-    /// A bridging type coercion
-    BridgingTypeCoercion
   };
 
   /// Determine the number of numeric values used for the given path
@@ -175,7 +173,6 @@ public:
     case KeyPathValue:
     case KeyPathComponentResult:
     case ExplicityTypeCoercion:
-    case BridgingTypeCoercion:
       return 0;
 
     case ContextualType:
@@ -248,7 +245,6 @@ public:
     case KeyPathValue:
     case KeyPathComponentResult:
     case ExplicityTypeCoercion:
-    case BridgingTypeCoercion:
       return 0;
 
     case FunctionArgument:
@@ -368,7 +364,6 @@ public:
     class OpenedGeneric;
     class KeyPathDynamicMember;
     class ExplicitTypeCoercion;
-    class BridgingTypeCoercion;
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -906,17 +901,6 @@ public:
   
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ExplicityTypeCoercion;
-  }
-};
-
-
-class LocatorPathElt::BridgingTypeCoercion final : public LocatorPathElt {
-public:
-  BridgingTypeCoercion()
-  : LocatorPathElt(ConstraintLocator::BridgingTypeCoercion) {}
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::BridgingTypeCoercion;
   }
 };
 

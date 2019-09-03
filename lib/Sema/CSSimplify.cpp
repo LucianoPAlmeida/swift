@@ -7753,20 +7753,28 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
-
+  auto coerceLocator = [&]() {
+    if (auto expr = dyn_cast_or_null<CoerceExpr>(locatorPtr->getAnchor())) {
+      // Only adding this path for explicty coercions e.g _ = a as Int
+      // and for non literal/array-literal subExpr.
+      if (!expr->isImplicit()
+          && !isa<LiteralExpr>(expr->getSubExpr())
+          && !isa<CollectionExpr>(expr->getSubExpr()))
+        return getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
+    }
+    return locatorPtr;
+  }();
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, locatorPtr);
+                       fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
   
-  auto bridgingPtr = getConstraintLocator(
-                       locator.withPathElement(LocatorPathElt::BridgingTypeCoercion()));
   // The source type can be explicitly converted to the destination type.
   Constraint *bridgingConstraint =
   Constraint::create(*this, ConstraintKind::BridgingConversion,
-                     fromType, toType, bridgingPtr);
+                     fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
 
   if (allowFixes && shouldAttemptFixes()) {

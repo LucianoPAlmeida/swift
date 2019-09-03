@@ -85,7 +85,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathValue:
     case KeyPathComponentResult:
     case ExplicityTypeCoercion:
-    case BridgingTypeCoercion:
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
@@ -417,10 +416,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
         
     case ExplicityTypeCoercion:
       out << "type coercion";
-      break;
-      
-    case BridgingTypeCoercion:
-      out << "bridging type coercion";
       break;
     }
   }
