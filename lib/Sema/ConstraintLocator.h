@@ -34,7 +34,6 @@ namespace swift {
 
 class Expr;
 class SourceManager;
-class CoerceExpr;
 
 namespace constraints {
   class ConstraintSystem;

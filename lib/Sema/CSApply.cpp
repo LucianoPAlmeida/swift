@@ -3525,12 +3525,20 @@ namespace {
       // Turn the subexpression into an rvalue.
       auto rvalueSub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(rvalueSub);
-
+      
+      auto *locator = [&]() {
+        // Only adding this path for explicty coercions e.g _ = a as Int
+        // and for non literal/array-literal subExpr.
+        if (!expr->isImplicit()
+            && !isa<LiteralExpr>(expr->getSubExpr())
+            && !isa<CollectionExpr>(expr->getSubExpr()))
+          return cs.getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
+        return cs.getConstraintLocator(expr);
+      }();
+      
       // If we weren't explicitly told by the caller which disjunction choice,
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
-      auto *locator = cs.getConstraintLocator(expr);
-
       if (!choice) {
         choice = solution.getDisjunctionChoice(locator);
       }

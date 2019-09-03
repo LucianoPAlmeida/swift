@@ -2661,7 +2661,15 @@ namespace {
       CS.setType(expr->getCastTypeLoc(), toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
-      auto locator = CS.getConstraintLocator(expr);
+      auto locator = [&]() {
+        // Only adding this path for explicty coercions e.g _ = a as Int
+        // and for non literal/array-literal subExpr.
+        if (!expr->isImplicit()
+            && !isa<LiteralExpr>(expr->getSubExpr())
+            && !isa<CollectionExpr>(expr->getSubExpr()))
+          return CS.getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
+        return CS.getConstraintLocator(expr);
+      }();
 
       // Add a conversion constraint for the direct conversion between
       // types.
@@ -2672,7 +2680,7 @@ namespace {
       // bindings for the result of the coercion.
       auto *TR = expr->getCastTypeLoc().getTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
-        return createTypeVariableAndDisjunctionForIUOCoercion(toType, locator);
+        return createTypeVariableAndDisjunctionForIUOCoercion(toType, CS.getConstraintLocator(expr));
 
       return toType;
     }
