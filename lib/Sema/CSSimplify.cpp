@@ -2807,7 +2807,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    if (locator.getBaseLocator()->isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
+    if (locator.getBaseLocator()->
+        isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
       auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
                                                    locator.getBaseLocator());
       recordFix(fix);
@@ -7759,11 +7760,13 @@ void ConstraintSystem::addExplicitConversionConstraint(
                        fromType, toType, locatorPtr);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
-
+  
+  auto bridgingPtr = getConstraintLocator(
+                       locator.withPathElement(LocatorPathElt::BridgingTypeCoercion()));
   // The source type can be explicitly converted to the destination type.
   Constraint *bridgingConstraint =
   Constraint::create(*this, ConstraintKind::BridgingConversion,
-                     fromType, toType, locatorPtr);
+                     fromType, toType, bridgingPtr);
   constraints.push_back(bridgingConstraint);
 
   if (allowFixes && shouldAttemptFixes()) {
