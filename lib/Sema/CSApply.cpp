@@ -3529,7 +3529,12 @@ namespace {
       // If we weren't explicitly told by the caller which disjunction choice,
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
-      auto *locator = cs.getConstraintLocator(expr);
+      auto *locator = [&]() {
+        // Only adding this path for explicty coercions e.g _ = a as Int
+        if (!expr->isImplicit())
+          return cs.getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
+        return cs.getConstraintLocator(expr);
+      }();
 
       if (!choice) {
         choice = solution.getDisjunctionChoice(locator);

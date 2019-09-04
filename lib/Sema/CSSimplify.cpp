@@ -2797,20 +2797,6 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
-  
-  if (!type1->isTypeVariableOrMember()
-      && !type2->isTypeVariableOrMember()
-      && type1->isEqual(type2)) {
-    if (locator.getBaseLocator()->
-        isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
-      if (!hasFixFor(locator.getBaseLocator())) {
-        auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
-                                                     locator.getBaseLocator());
-        recordFix(fix);
-      }
-    }
-  }
-  
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal);
@@ -2820,9 +2806,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
-  if (desugar1->isEqual(desugar2)
-      && !isa<InOutType>(desugar2)) {
-    return getTypeMatchSuccess();
+  if (desugar1->isEqual(desugar2)) {
+    if (locator.getBaseLocator()->
+        isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
+      if (!hasFixFor(locator.getBaseLocator())) {
+        auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
+                                                     locator.getBaseLocator());
+        recordFix(fix);
+      }
+    }
+    if (!isa<InOutType>(desugar2))
+      return getTypeMatchSuccess();
   }
 
   // Local function that should be used to produce the return value whenever
@@ -7761,18 +7755,10 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto coerceLocator = [&]() {
-    if (auto expr = dyn_cast_or_null<CoerceExpr>(locatorPtr->getAnchor())) {
-      // Only adding this path for explicty coercions e.g _ = a as Int
-      if (!expr->isImplicit())
-        return getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
-    }
-    return locatorPtr;
-  }();
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, coerceLocator);
+                       fromType, toType, locatorPtr);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
   
