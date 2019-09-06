@@ -180,7 +180,7 @@ var c2f2: C2<[Float]>? = b as! C3
 
 
 // <rdar://problem/15633178>
-var f: (Float) -> Float = { $0 as Float }
+var f: (Float) -> Float = { $0 as Float } // expected-warning {{casting expression to 'Float' doesn't change the type}} {{32-41=}}
 var f2: (B) -> Bool = { $0 is D }
 
 func metatype_casts<T, U>(_ b: B.Type, t:T.Type, u: U.Type) {

@@ -7778,7 +7778,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
 
   auto locatorPtr = getConstraintLocator(locator);
   auto coerceLocator = [&]() {
-    if (addCoercionPathElt) {
+    if (addCoercionPathElt && shouldAttemptFixes()) {
       if (auto *expr = dyn_cast_or_null<CoerceExpr>(locator.getAnchor())) {
         // Only adding this path for explicty coercions e.g _ = a as Int
         // and also only for left-side is a DeclRefExpr or a
