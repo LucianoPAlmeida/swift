@@ -2807,8 +2807,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    if (locator.getBaseLocator()->
-        isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
+    if (kind >= ConstraintKind::Conversion &&
+        locator.getBaseLocator()->
+          isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
       if (!hasFixFor(locator.getBaseLocator())) {
         auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
                                                      locator.getBaseLocator());
@@ -7751,14 +7752,28 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 void ConstraintSystem::addExplicitConversionConstraint(
                                            Type fromType, Type toType,
                                            bool allowFixes,
-                                           ConstraintLocatorBuilder locator) {
+                                           ConstraintLocatorBuilder locator,
+                                           bool addCoercionPathElt) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
+  auto coerceLocator = [&]() {
+    if (addCoercionPathElt) {
+      if (auto *expr = dyn_cast_or_null<CoerceExpr>(locator.getAnchor())) {
+        // Only adding this path for explicty coercions e.g _ = a as Int
+        // and also only for left-side is a DeclRefExpr or a
+        // explicit/implicity coercion e.g. Double(1) as Double
+        if (!expr->isImplicit() &&
+            (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr())))
+          return getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
+      }
+    }
+    return locatorPtr;
+  }();
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, locatorPtr);
+                       fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
   

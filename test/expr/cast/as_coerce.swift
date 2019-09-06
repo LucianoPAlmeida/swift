@@ -153,3 +153,17 @@ _ = sr11295d as Type // expected-warning {{casting expression to 'Type' (aka 'St
 
 _ = "Hello" as String // Ok
 _ = 1 as Int64 // Ok
+_ = [] as Set<Int> // Ok
+
+class A {}
+class B: A {}
+
+var a = A()
+var b = B()
+
+var ba = b as A // Ok 
+
+_ = 1 as Double as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{17-27=}}
+_ = Double(1) as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{15-25=}}
+_ = Int(1) as Int  // expected-warning {{casting expression to 'Int' doesn't change the type}} {{12-19=}}
+
