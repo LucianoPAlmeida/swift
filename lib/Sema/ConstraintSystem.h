@@ -2191,8 +2191,8 @@ public:
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        bool allowFixes,
-                                       ConstraintLocatorBuilder locator,
-                                       bool addCoercionPathElt = false);
+                                       bool addCoercionPathElt,
+                                       ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
   void

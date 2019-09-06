@@ -5768,10 +5768,12 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
       addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
                                       /*allowFixes=*/false,
+                                      /*addCoercionPathElt*/false,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
                                       /*allowFixes=*/false,
+                                      /*addCoercionPathElt*/false,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       countOptionalInjections();
@@ -7752,8 +7754,8 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 void ConstraintSystem::addExplicitConversionConstraint(
                                            Type fromType, Type toType,
                                            bool allowFixes,
-                                           ConstraintLocatorBuilder locator,
-                                           bool addCoercionPathElt) {
+                                           bool addCoercionPathElt,
+                                           ConstraintLocatorBuilder locator) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
