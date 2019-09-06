@@ -81,7 +81,7 @@ c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to us
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{cannot convert value of type 'Double' to type 'Float' in coercion}}
 1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
-Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}} // expected-warning {{casting expression to 'Double' doesn't change the type}} {{11-21=}}
 ["awd"] as [Int] // expected-error{{cannot convert value of type 'String' to expected element type 'Int'}}
 ([1, 2, 1.0], 1) as ([String], Int)
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
@@ -155,13 +155,13 @@ _ = "Hello" as String // Ok
 _ = 1 as Int64 // Ok
 _ = [] as Set<Int> // Ok
 
-class A {}
-class B: A {}
+class SR11295A {}
+class SR11295B: SR11295A {}
 
-var a = A()
-var b = B()
+var sr11295ap = SR11295A()
+var sr11295bc = SR11295B()
 
-var ba = b as A // Ok 
+_ = sr11295bc as SR11295A // Ok 
 
 _ = 1 as Double as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{17-27=}}
 _ = Double(1) as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{15-25=}}

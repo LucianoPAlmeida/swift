@@ -2807,12 +2807,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
+    auto locatorPtr = locator.getBaseLocator();
     if (kind >= ConstraintKind::Conversion &&
-        locator.getBaseLocator()->
+        locatorPtr->
           isLastElement(ConstraintLocator::PathElementKind::ExplicityTypeCoercion)) {
-      if (!hasFixFor(locator.getBaseLocator())) {
+      if (!llvm::any_of(getFixes(), [&locatorPtr](const ConstraintFix *fix) -> bool {
+        if (fix->getLocator() == locatorPtr)
+          return true;
+        return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
+      })) {
         auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
-                                                     locator.getBaseLocator());
+                                                     locatorPtr);
         recordFix(fix);
       }
     }
