@@ -5786,12 +5786,10 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
       addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
                                       /*allowFixes=*/false,
-                                      /*addCoercionPathElt*/false,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
                                       /*allowFixes=*/false,
-                                      /*addCoercionPathElt*/false,
                                       locator.withPathElement(
                                         LocatorPathElt::GenericArgument(0)));
       countOptionalInjections();
@@ -7772,13 +7770,12 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 void ConstraintSystem::addExplicitConversionConstraint(
                                            Type fromType, Type toType,
                                            bool allowFixes,
-                                           bool addCoercionPathElt,
                                            ConstraintLocatorBuilder locator) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
   auto coerceLocator = [&]() {
-    if (addCoercionPathElt && shouldAttemptFixes()) {
+    if (allowFixes && shouldAttemptFixes()) {
       if (auto *expr = dyn_cast_or_null<CoerceExpr>(locator.getAnchor())) {
         // Only adding this path for explicty coercions e.g _ = a as Int
         // and also only for left-side is a DeclRefExpr or a

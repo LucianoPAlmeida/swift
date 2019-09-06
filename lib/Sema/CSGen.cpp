@@ -2666,15 +2666,13 @@ namespace {
       // Add a conversion constraint for the direct conversion between
       // types.
       CS.addExplicitConversionConstraint(fromType, toType,
-                                         /*allowFixes=*/true,
-                                         /*addCoercionPathElt*/true,
-                                         locator);
+                                         /*allowFixes=*/true, locator);
 
       // If the result type was declared IUO, add a disjunction for
       // bindings for the result of the coercion.
       auto *TR = expr->getCastTypeLoc().getTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
-        return createTypeVariableAndDisjunctionForIUOCoercion(toType, CS.getConstraintLocator(expr));
+        return createTypeVariableAndDisjunctionForIUOCoercion(toType, locator);
 
       return toType;
     }
