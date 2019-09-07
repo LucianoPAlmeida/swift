@@ -2824,7 +2824,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
-
+  
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
     auto locatorPtr = locator.getBaseLocator();
@@ -7777,10 +7777,12 @@ void ConstraintSystem::addExplicitConversionConstraint(
   auto coerceLocator = [&]() {
     if (allowFixes && shouldAttemptFixes()) {
       if (auto *expr = dyn_cast_or_null<CoerceExpr>(locator.getAnchor())) {
+        auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
         // Only adding this path for explicty coercions e.g _ = a as Int
         // and also only for left-side is a DeclRefExpr or a
         // explicit/implicity coercion e.g. Double(1) as Double
         if (!expr->isImplicit() &&
+            !isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
             (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr())))
           return getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
       }
