@@ -7795,7 +7795,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
                        fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
-  
+
   // The source type can be explicitly converted to the destination type.
   Constraint *bridgingConstraint =
   Constraint::create(*this, ConstraintKind::BridgingConversion,
