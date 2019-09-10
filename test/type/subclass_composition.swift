@@ -126,8 +126,8 @@ func basicSubtyping(
   let _: Derived & AnyObject = derived
 
   let _ = base as Base<Int> & P1
-  let _ = base as Base<Int> & AnyObject
-  let _ = derived as Derived & AnyObject
+  let _ = base as Base<Int> & AnyObject // expected-warning {{casting expression to 'Base<Int>' doesn't change the type}} {{16-41=}}
+  let _ = derived as Derived & AnyObject // expected-warning {{casting expression to 'Derived' doesn't change the type}} {{19-42=}}
 
   let _ = base as? Base<Int> & P1 // expected-warning {{always succeeds}}
   let _ = base as? Base<Int> & AnyObject // expected-warning {{always succeeds}}
@@ -170,7 +170,7 @@ func basicSubtyping(
   let _ = baseAndP1 as Base<Int>
   let _ = derivedAndP3 as Base<Int>
   let _ = derivedAndP2 as Derived
-  let _ = derivedAndAnyObject as Derived
+  let _ = derivedAndAnyObject as Derived // expected-warning {{casting expression to 'Derived' doesn't change the type}} {{31-42=}}
 
   let _ = baseAndP1 as? Base<Int> // expected-warning {{always succeeds}}
   let _ = derivedAndP3 as? Base<Int> // expected-warning {{always succeeds}}
@@ -340,8 +340,8 @@ func metatypeSubtyping(
 
   let _ = baseIntAndP2 as Base<Int>.Type
   let _ = baseIntAndP2AndAnyObject as Base<Int>.Type
-  let _ = derivedAndAnyObject as Derived.Type
-  let _ = baseIntAndP2AndAnyObject as BaseAndP2<Int>.Type
+  let _ = derivedAndAnyObject as Derived.Type // expected-warning {{casting expression to 'Derived.Type' doesn't change the type}} {{31-47=}}
+  let _ = baseIntAndP2AndAnyObject as BaseAndP2<Int>.Type // expected-warning {{casting expression to 'BaseAndP2<Int>.Type' (aka '(Base<Int> & P2).Type') doesn't change the type}} {{36-59=}}
 
   let _ = baseIntAndP2 as? Base<Int>.Type // expected-warning {{always succeeds}}
   let _ = baseIntAndP2AndAnyObject as? Base<Int>.Type // expected-warning {{always succeeds}}

@@ -2824,7 +2824,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
-  
+
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
     if (shouldDiagnoseUnecessaryExplicityCoercion(*this, kind, locator)) {

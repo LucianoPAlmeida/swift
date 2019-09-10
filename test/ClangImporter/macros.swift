@@ -104,7 +104,7 @@ func testNil() {
 
 func testBitwiseOps() {
   _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong // expected-warning {{casting expression to 'CUnsignedLongLong' (aka 'UInt64') doesn't change the type}} {{29-50=}}
-  _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt 
+  _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt
   _ = BIT_SHIFT_3 as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{19-32=}}
   _ = BIT_SHIFT_4 as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{19-35=}}
 

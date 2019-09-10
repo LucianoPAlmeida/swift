@@ -148,7 +148,7 @@ func testImportStddefTypes() {
 
 func testImportSysTypesTypes() {
   let t1_unqual: Int = ssize_t_test
-  _ = t1_unqual as ctypes.ssize_t // // expected-warning {{casting expression to 'ssize_t' (aka 'Int') doesn't change the type}} {{17-35=}}
+  _ = t1_unqual as ctypes.ssize_t // expected-warning {{casting expression to 'ssize_t' (aka 'Int') doesn't change the type}} {{17-35=}}
 }
 
 func testImportOSTypesTypes() {
