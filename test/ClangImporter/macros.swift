@@ -103,15 +103,15 @@ func testNil() {
 }
 
 func testBitwiseOps() {
-  _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong
-  _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt
-  _ = BIT_SHIFT_3 as CLongLong
-  _ = BIT_SHIFT_4 as CUnsignedInt
+  _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong // expected-warning {{casting expression to 'CUnsignedLongLong' (aka 'UInt64') doesn't change the type}} {{29-50=}}
+  _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt 
+  _ = BIT_SHIFT_3 as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{19-32=}}
+  _ = BIT_SHIFT_4 as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{19-35=}}
 
-  _ = RSHIFT_ONE as CUnsignedInt
+  _ = RSHIFT_ONE as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{18-34=}}
   _ = RSHIFT_INVALID // expected-error {{use of unresolved identifier 'RSHIFT_INVALID'}}
 
-  _ = XOR_HIGH as CUnsignedLongLong
+  _ = XOR_HIGH as CUnsignedLongLong // expected-warning {{casting expression to 'CUnsignedLongLong' (aka 'UInt64') doesn't change the type}} {{16-37=}}
 
   var attributes = 0 as CInt
   attributes |= ATTR_BOLD
@@ -121,30 +121,30 @@ func testBitwiseOps() {
 }
 
 func testIntegerArithmetic() {
-  _ = ADD_ZERO as CInt
-  _ = ADD_ONE as CInt
-  _ = ADD_TWO as CInt
-  _ = ADD_MINUS_TWO as CInt
-  _ = ADD_MIXED_WIDTH as CLongLong
-  _ = ADD_MIXED_SIGN as CLongLong
-  _ = ADD_UNDERFLOW as CUnsignedInt
-  _ = ADD_OVERFLOW as CUnsignedInt
+  _ = ADD_ZERO as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{16-24=}}
+  _ = ADD_ONE as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{15-23=}}
+  _ = ADD_TWO as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{15-23=}}
+  _ = ADD_MINUS_TWO as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{21-29=}}
+  _ = ADD_MIXED_WIDTH as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{23-36=}}
+  _ = ADD_MIXED_SIGN as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{22-35=}}
+  _ = ADD_UNDERFLOW as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{21-37=}}
+  _ = ADD_OVERFLOW as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{20-36=}}
 
-  _ = SUB_ONE as CInt
-  _ = SUB_ZERO as CInt
-  _ = SUB_MINUS_ONE as CInt
-  _ = SUB_MIXED_WIDTH as CLongLong
-  _ = SUB_MIXED_SIGN as CUnsignedInt
-  _ = SUB_UNDERFLOW as CUnsignedInt
-  _ = SUB_OVERFLOW as CUnsignedInt
+  _ = SUB_ONE as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{15-23=}}
+  _ = SUB_ZERO as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{16-24=}}
+  _ = SUB_MINUS_ONE as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{21-29=}}
+  _ = SUB_MIXED_WIDTH as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{23-36=}}
+  _ = SUB_MIXED_SIGN as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{22-38=}}
+  _ = SUB_UNDERFLOW as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{21-37=}}
+  _ = SUB_OVERFLOW as CUnsignedInt // expected-warning {{casting expression to 'CUnsignedInt' (aka 'UInt32') doesn't change the type}} {{20-36=}}
 
-  _ = MULT_POS as CInt
-  _ = MULT_NEG as CInt
-  _ = MULT_MIXED_TYPES as CLongLong
+  _ = MULT_POS as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{16-24=}}
+  _ = MULT_NEG as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{16-24=}}
+  _ = MULT_MIXED_TYPES as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{24-37=}}
 
-  _ = DIVIDE_INTEGRAL as CInt
-  _ = DIVIDE_NONINTEGRAL as CInt
-  _ = DIVIDE_MIXED_TYPES as CLongLong
+  _ = DIVIDE_INTEGRAL as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{23-31=}}
+  _ = DIVIDE_NONINTEGRAL as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{26-34=}}
+  _ = DIVIDE_MIXED_TYPES as CLongLong // expected-warning {{casting expression to 'CLongLong' (aka 'Int64') doesn't change the type}} {{26-39=}}
   _ = DIVIDE_INVALID // expected-error {{use of unresolved identifier 'DIVIDE_INVALID'}}
 }
 
