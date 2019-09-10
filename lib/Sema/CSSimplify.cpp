@@ -2829,7 +2829,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (desugar1->isEqual(desugar2)) {
     auto locatorPtr = locator.getBaseLocator();
     if (shouldDiagnoseUnecessaryExplicityCoercion(*this, kind, locator)) {
-      auto *fix = RemoveUnecessaryCoercion::create(*this, type2,
+      auto *fix = RemoveUnecessaryCoercion::create(*this, type1, type2,
                                                    locatorPtr);
       recordFix(fix);
       

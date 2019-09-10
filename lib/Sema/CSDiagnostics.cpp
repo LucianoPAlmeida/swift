@@ -4264,10 +4264,18 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 
 bool UnecessaryCoecionFailure::diagnoseAsError() {
   auto expr = dyn_cast<CoerceExpr>(getAnchor());
-
-  emitDiagnostic(expr->getLoc(), diag::unecessary_same_type_coercion, getToType())
-      .fixItRemove(SourceRange(expr->getLoc(),
-                               expr->getCastTypeLoc().getSourceRange().End));
+  
+  if (!getFromType()->isCanonical() &&
+      !getToType()->isCanonical()) {
+    emitDiagnostic(expr->getLoc(), diag::unecessary_same_non_canonical_type_coercion,
+                   getFromType(), getToType())
+        .fixItRemove(SourceRange(expr->getLoc(),
+                                 expr->getCastTypeLoc().getSourceRange().End));
+  } else {
+    emitDiagnostic(expr->getLoc(), diag::unecessary_same_type_coercion, getToType())
+        .fixItRemove(SourceRange(expr->getLoc(),
+                                 expr->getCastTypeLoc().getSourceRange().End));
+  }
   return true;
 }
 

@@ -1600,15 +1600,18 @@ public:
 };
 
 class UnecessaryCoecionFailure final : public FailureDiagnostic {
+  Type fromType;
   Type toType;
 
 public:
   UnecessaryCoecionFailure(ConstraintSystem &cs,
+                           Type fromType,
                            Type toType,
                            ConstraintLocator *locator)
-  : FailureDiagnostic(locator->getAnchor(), cs, locator), toType(toType) {}
+  : FailureDiagnostic(locator->getAnchor(), cs, locator), fromType(fromType), toType(toType) {}
   
   Type getToType() { return toType; }
+  Type getFromType() { return fromType; }
   
   bool diagnoseAsError() override;
 };

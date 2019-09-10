@@ -1292,22 +1292,27 @@ public:
 };
 
 class RemoveUnecessaryCoercion : public ConstraintFix {
+  Type fromType;
   Type toType;
   
 protected:
-  RemoveUnecessaryCoercion(ConstraintSystem &cs, Type toType,
+  RemoveUnecessaryCoercion(ConstraintSystem &cs,
+                           Type fromType, Type toType,
                            ConstraintLocator *locator)
-  : ConstraintFix(cs, FixKind::RemoveUnecessaryCoercion, locator, /*isWarning*/ true), toType(toType) {}
+  : ConstraintFix(cs, FixKind::RemoveUnecessaryCoercion, locator, /*isWarning*/ true),
+                  fromType(fromType), toType(toType) {}
 
   
 public:
   std::string getName() const override { return "remove unecessary explicit type coercion"; }
   
   Type getToType() const { return toType; }
+  Type getFromType() const { return fromType; }
   
   bool diagnose(Expr *root, bool asNote = false) const override;
   
-  static RemoveUnecessaryCoercion *create(ConstraintSystem &cs, Type toType,
+  static RemoveUnecessaryCoercion *create(ConstraintSystem &cs,
+                                          Type fromType, Type toType,
                                           ConstraintLocator *locator);
 
 };

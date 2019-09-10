@@ -762,16 +762,19 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 bool RemoveUnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
 
-  UnecessaryCoecionFailure failure(cs, getToType(), getLocator());
+  UnecessaryCoecionFailure failure(cs,
+                                   getFromType(), getToType(),
+                                   getLocator());
   return failure.diagnoseAsError();
 }
 
 RemoveUnecessaryCoercion
 *RemoveUnecessaryCoercion::create(ConstraintSystem &cs,
+                                  Type fromType,
                                   Type toType,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      RemoveUnecessaryCoercion(cs, toType, locator);
+      RemoveUnecessaryCoercion(cs, fromType, toType, locator);
 }
 
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
