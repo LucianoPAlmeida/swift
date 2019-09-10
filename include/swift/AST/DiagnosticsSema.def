@@ -918,7 +918,7 @@ WARNING(conditional_downcast_coercion,none,
 WARNING(unecessary_same_type_coercion,none,
         "casting expression to %0 doesn't change the type",
         (Type))
-WARNING(unecessary_same_non_canonical_type_coercion,none,
+WARNING(unecessary_same_typealias_type_coercion,none,
         "casting expression of type %0 to %1 doesn't change the type",
         (Type, Type))
 WARNING(forced_downcast_noop,none,

@@ -167,3 +167,8 @@ _ = 1 as Double as Double // expected-warning {{casting expression to 'Double' d
 _ = Double(1) as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{15-25=}}
 _ = Int(1) as Int  // expected-warning {{casting expression to 'Int' doesn't change the type}} {{12-19=}}
 
+typealias Double1 = Double
+typealias Double2 = Double
+
+let sr11295ta1: Double1 = 1.0
+_ = sr11295ta1 as Double2 // expected-warning {{casting expression of type 'Double1' (aka 'Double') to 'Double2' (aka 'Double') doesn't change the type}} {{16-27=}}
