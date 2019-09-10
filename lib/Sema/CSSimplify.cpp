@@ -2827,10 +2827,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    auto locatorPtr = locator.getBaseLocator();
     if (shouldDiagnoseUnecessaryExplicityCoercion(*this, kind, locator)) {
       auto *fix = RemoveUnecessaryCoercion::create(*this, type1, type2,
-                                                   locatorPtr);
+                                                   locator.getBaseLocator());
       recordFix(fix);
       
     }

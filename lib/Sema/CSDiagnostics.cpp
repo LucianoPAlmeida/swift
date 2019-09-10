@@ -4267,7 +4267,8 @@ bool UnecessaryCoecionFailure::diagnoseAsError() {
   
   auto diag = [&]() {
     if (isa<TypeAliasType>(getFromType().getPointer()) &&
-        isa<TypeAliasType>(getToType().getPointer())) {
+        isa<TypeAliasType>(getToType().getPointer()) &&
+        !getFromType()->isAnyObject()) {
       return emitDiagnostic(expr->getLoc(),
                             diag::unecessary_same_typealias_type_coercion,
                             getFromType(), getToType());
