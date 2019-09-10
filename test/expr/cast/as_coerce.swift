@@ -172,3 +172,4 @@ typealias Double2 = Double
 
 let sr11295ta1: Double1 = 1.0
 _ = sr11295ta1 as Double2 // expected-warning {{casting expression of type 'Double1' (aka 'Double') to 'Double2' (aka 'Double') doesn't change the type}} {{16-27=}}
+_ = sr11295ta1 as Double1 // expected-warning {{casting expression to 'Double1' (aka 'Double') doesn't change the type}} {{16-27=}}
