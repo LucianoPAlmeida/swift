@@ -81,7 +81,7 @@ c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to us
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{cannot convert value of type 'Double' to type 'Float' in coercion}}
 1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
-Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}} // expected-warning {{casting expression to 'Double' doesn't change the type}} {{11-21=}}
+Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}} // expected-warning {{redundant cast to 'Double' has no effect}} {{11-21=}}
 ["awd"] as [Int] // expected-error{{cannot convert value of type 'String' to expected element type 'Int'}}
 ([1, 2, 1.0], 1) as ([String], Int)
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
@@ -138,18 +138,18 @@ _ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to '
 
 // SR-11295
 let sr11295a = "Hello"
-_ = sr11295a as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{14-24=}}
+_ = sr11295a as String // expected-warning {{redundant cast to 'String' has no effect}} {{14-24=}}
 
 let sr11295b = 1
-_ = sr11295b as Int // expected-warning {{casting expression to 'Int' doesn't change the type}} {{14-21=}}
+_ = sr11295b as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{14-21=}}
 
 typealias Type = String
 
 let sr11295c: Type = "Hello Typealias"
-_ = sr11295c as String // expected-warning {{casting expression to 'String' doesn't change the type}} {{14-24=}}
+_ = sr11295c as String // expected-warning {{redundant cast to 'String' has no effect}} {{14-24=}}
 
 let sr11295d = "Hello Typealias"
-_ = sr11295d as Type // expected-warning {{casting expression to 'Type' (aka 'String') doesn't change the type}} {{14-22=}}
+_ = sr11295d as Type // expected-warning {{redundant cast to 'Type' (aka 'String') has no effect}} {{14-22=}}
 
 _ = "Hello" as String // Ok
 _ = 1 as Int64 // Ok
@@ -163,13 +163,13 @@ var sr11295bc = SR11295B()
 
 _ = sr11295bc as SR11295A // Ok 
 
-_ = 1 as Double as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{17-27=}}
-_ = Double(1) as Double // expected-warning {{casting expression to 'Double' doesn't change the type}} {{15-25=}}
-_ = Int(1) as Int  // expected-warning {{casting expression to 'Int' doesn't change the type}} {{12-19=}}
+_ = 1 as Double as Double // expected-warning {{redundant cast to 'Double' has no effect}} {{17-27=}}
+_ = Double(1) as Double // expected-warning {{redundant cast to 'Double' has no effect}} {{15-25=}}
+_ = Int(1) as Int  // expected-warning {{redundant cast to 'Int' has no effect}} {{12-19=}}
 
 typealias Double1 = Double
 typealias Double2 = Double
 
 let sr11295ta1: Double1 = 1.0
-_ = sr11295ta1 as Double2 // expected-warning {{casting expression of type 'Double1' (aka 'Double') to 'Double2' (aka 'Double') doesn't change the type}} {{16-27=}}
-_ = sr11295ta1 as Double1 // expected-warning {{casting expression to 'Double1' (aka 'Double') doesn't change the type}} {{16-27=}}
+_ = sr11295ta1 as Double2 // expected-warning {{redundant cast from 'Double1' (aka 'Double') to 'Double2' (aka 'Double') has no effect}} {{16-27=}}
+_ = sr11295ta1 as Double1 // expected-warning {{redundant cast to 'Double1' (aka 'Double') has no effect}} {{16-27=}}

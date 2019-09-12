@@ -26,20 +26,20 @@ extension Set {
 }
 
 func foo() {
-  _  = NSStringToNSString as (String?) -> String? // expected-warning {{casting expression to '(String?) -> String?' doesn't change the type}} {{27-51=}}
+  _  = NSStringToNSString as (String?) -> String? // expected-warning {{redundant cast to '(String?) -> String?' has no effect}} {{27-51=}}
   _ = DummyClass().nsstringProperty.onlyOnString() as String
 
-  _  = BOOLtoBOOL as (Bool) -> Bool // expected-warning {{casting expression to '(Bool) -> Bool' doesn't change the type}} {{19-37=}}
+  _  = BOOLtoBOOL as (Bool) -> Bool // expected-warning {{redundant cast to '(Bool) -> Bool' has no effect}} {{19-37=}}
   _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
-  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?) // expected-warning {{casting expression to '(Array<Any>?) -> (Array<Any>?)' doesn't change the type}} {{21-55=}}
+  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?) // expected-warning {{redundant cast to '(Array<Any>?) -> (Array<Any>?)' has no effect}} {{21-55=}}
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>? // expected-warning {{casting expression to '(Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?' doesn't change the type}} {{18-86=}}
+  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>? // expected-warning {{redundant cast to '(Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?' has no effect}} {{18-86=}}
 
   DummyClass().dictProperty.onlyOnDictionary()
 
-  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>? // expected-warning {{casting expression to '(Set<AnyHashable>?) -> Set<AnyHashable>?' doesn't change the type}} {{16-60=}}
+  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>? // expected-warning {{redundant cast to '(Set<AnyHashable>?) -> Set<AnyHashable>?' has no effect}} {{16-60=}}
   DummyClass().setProperty.onlyOnSet()
 }
 

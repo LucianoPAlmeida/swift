@@ -292,7 +292,7 @@ func rdar19836341(_ ns: NSString?, vns: NSString?) {
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
   var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}{{21-21= as String?}}
-  var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}{{43-43= as NSString}} expected-warning {{casting expression to 'String' doesn't change the type}} {{34-44=}}
+  var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}{{43-43= as NSString}} expected-warning {{redundant cast to 'String' has no effect}} {{34-44=}}
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}{{39-39= as NSString?}}
 
@@ -346,7 +346,7 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = d as AnyObject
   z = e as AnyObject
   z = f as AnyObject
-  z = g as AnyObject // expected-warning {{casting expression to 'AnyObject' doesn't change the type}} {{9-22=}}
+  z = g as AnyObject // expected-warning {{redundant cast to 'AnyObject' has no effect}} {{9-22=}}
   z = h as AnyObject
 
   z = a // expected-error{{does not conform to 'AnyObject'}}

@@ -916,10 +916,10 @@ WARNING(conditional_downcast_coercion,none,
         "conditional cast from %0 to %1 always succeeds",
         (Type, Type))
 WARNING(unnecessary_same_type_coercion,none,
-        "casting expression to %0 doesn't change the type",
+        "redundant cast to %0 has no effect",
         (Type))
 WARNING(unnecessary_same_typealias_type_coercion,none,
-        "casting expression of type %0 to %1 doesn't change the type",
+        "redundant cast from %0 to %1 has no effect",
         (Type, Type))
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))

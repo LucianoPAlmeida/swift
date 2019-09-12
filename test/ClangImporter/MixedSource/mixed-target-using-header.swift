@@ -53,13 +53,13 @@ func testSuppressed() {
 #endif
 
 func testMacro() {
-  _ = CONSTANT as CInt // expected-warning {{casting expression to 'CInt' (aka 'Int32') doesn't change the type}} {{16-24=}}
+  _ = CONSTANT as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{16-24=}}
 }
 
 func testFoundationOverlay() {
   _ = NSUTF8StringEncoding // no ambiguity
   // and we should get the overlay version
-  _ = NSUTF8StringEncoding as UInt // expected-warning {{casting expression to 'UInt' doesn't change the type}} {{28-36=}}
+  _ = NSUTF8StringEncoding as UInt // expected-warning {{redundant cast to 'UInt' has no effect}} {{28-36=}}
 }
 
 #if !SILGEN
