@@ -138,7 +138,7 @@ public:
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
     /// A explicity type coercion
-    ExplicityTypeCoercion,
+    ExplicitTypeCoercion,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -172,7 +172,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case ExplicityTypeCoercion:
+    case ExplicitTypeCoercion:
       return 0;
 
     case ContextualType:
@@ -244,7 +244,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case ExplicityTypeCoercion:
+    case ExplicitTypeCoercion:
       return 0;
 
     case FunctionArgument:
@@ -897,10 +897,10 @@ public:
 class LocatorPathElt::ExplicitTypeCoercion final : public LocatorPathElt {
 public:
   ExplicitTypeCoercion()
-  : LocatorPathElt(ConstraintLocator::ExplicityTypeCoercion) {}
+  : LocatorPathElt(ConstraintLocator::ExplicitTypeCoercion) {}
   
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ExplicityTypeCoercion;
+    return elt->getKind() == ConstraintLocator::ExplicitTypeCoercion;
   }
 };
 

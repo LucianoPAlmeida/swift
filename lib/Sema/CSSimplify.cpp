@@ -2801,7 +2801,7 @@ shouldDiagnoseUnnecessaryExplicitCoercion(ConstraintSystem &CS,
   if (kind >= ConstraintKind::Conversion) {
     if (locator.last().hasValue() &&
         locator.last().getValue().getKind()
-            == ConstraintLocator::PathElementKind::ExplicityTypeCoercion) {
+            == ConstraintLocator::PathElementKind::ExplicitTypeCoercion) {
       
       return llvm::none_of(CS.getFixes(), [&locatorPtr](const ConstraintFix *fix) -> bool {
         if (fix->getLocator() == locatorPtr)
