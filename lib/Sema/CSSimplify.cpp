@@ -2830,7 +2830,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (shouldDiagnoseUnnecessaryExplicitCoercion(*this, kind, locator)) {
       auto *fix = RemoveUnnecessaryCoercion::create(*this, type1, type2,
                                                     locator.getBaseLocator());
-      recordFix(fix);
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
       
     }
     if (!isa<InOutType>(desugar2))
