@@ -2794,7 +2794,7 @@ bool ConstraintSystem::repairFailures(
 }
 
 static bool
-shouldDiagnoseUnecessaryExplicityCoercion(ConstraintSystem &CS,
+shouldDiagnoseUnnecessaryExplicitCoercion(ConstraintSystem &CS,
                                           ConstraintKind kind,
                                           ConstraintLocatorBuilder locator) {
   auto locatorPtr = locator.getBaseLocator();
@@ -2803,7 +2803,7 @@ shouldDiagnoseUnecessaryExplicityCoercion(ConstraintSystem &CS,
         locator.last().getValue().getKind()
             == ConstraintLocator::PathElementKind::ExplicityTypeCoercion) {
       
-      return !llvm::any_of(CS.getFixes(), [&locatorPtr](const ConstraintFix *fix) -> bool {
+      return llvm::none_of(CS.getFixes(), [&locatorPtr](const ConstraintFix *fix) -> bool {
         if (fix->getLocator() == locatorPtr)
           return true;
         return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
@@ -2827,9 +2827,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // If the types are obviously equivalent, we're done.
   if (desugar1->isEqual(desugar2)) {
-    if (shouldDiagnoseUnecessaryExplicityCoercion(*this, kind, locator)) {
-      auto *fix = RemoveUnecessaryCoercion::create(*this, type1, type2,
-                                                   locator.getBaseLocator());
+    if (shouldDiagnoseUnnecessaryExplicitCoercion(*this, kind, locator)) {
+      auto *fix = RemoveUnnecessaryCoercion::create(*this, type1, type2,
+                                                    locator.getBaseLocator());
       recordFix(fix);
       
     }
@@ -7521,7 +7521,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
-  case FixKind::RemoveUnecessaryCoercion:
+  case FixKind::RemoveUnnecessaryCoercion:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -7779,7 +7779,7 @@ void ConstraintSystem::addExplicitConversionConstraint(
         auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
         // Only adding this path for explicty coercions e.g _ = a as Int
         // and also only for left-side is a DeclRefExpr or a
-        // explicit/implicity coercion e.g. Double(1) as Double
+        // explicit/implicit coercion e.g. Double(1) as Double
         if (!expr->isImplicit() &&
             !isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
             (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr())))

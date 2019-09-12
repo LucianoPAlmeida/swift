@@ -4262,24 +4262,24 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
-bool UnecessaryCoecionFailure::diagnoseAsError() {
-  auto expr = dyn_cast<CoerceExpr>(getAnchor());
+bool UnnecessaryCoercionFailure::diagnoseAsError() {
+  auto expr = cast<CoerceExpr>(getAnchor());
   
   auto diag = [&]() {
     if (isa<TypeAliasType>(getFromType().getPointer()) &&
         isa<TypeAliasType>(getToType().getPointer())) {
-      auto fromTypeAlias = dyn_cast<TypeAliasType>(getFromType().getPointer());
-      auto toTypeAlias = dyn_cast<TypeAliasType>(getToType().getPointer());
+      auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
+      auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
       // If the typealias are the same, we don't need a warning
       // mentioning both types.
       if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
         return emitDiagnostic(expr->getLoc(),
-                              diag::unecessary_same_typealias_type_coercion,
+                              diag::unnecessary_same_typealias_type_coercion,
                               getFromType(), getToType());
       }
     }
     return emitDiagnostic(expr->getLoc(),
-                          diag::unecessary_same_type_coercion, getToType());
+                          diag::unnecessary_same_type_coercion, getToType());
     
   }();
   

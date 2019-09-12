@@ -1599,16 +1599,17 @@ public:
   bool diagnoseAsError() override;
 };
 
-class UnecessaryCoecionFailure final : public FailureDiagnostic {
+class UnnecessaryCoercionFailure final : public FailureDiagnostic {
   Type fromType;
   Type toType;
 
 public:
-  UnecessaryCoecionFailure(ConstraintSystem &cs,
-                           Type fromType,
-                           Type toType,
-                           ConstraintLocator *locator)
-  : FailureDiagnostic(locator->getAnchor(), cs, locator), fromType(fromType), toType(toType) {}
+  UnnecessaryCoercionFailure(Expr *root,
+                             ConstraintSystem &cs,
+                             Type fromType,
+                             Type toType,
+                             ConstraintLocator *locator)
+  : FailureDiagnostic(root, cs, locator), fromType(fromType), toType(toType) {}
   
   Type getToType() { return toType; }
   Type getFromType() { return fromType; }

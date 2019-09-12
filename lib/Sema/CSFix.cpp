@@ -759,22 +759,22 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
-bool RemoveUnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
+bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
 
-  UnecessaryCoecionFailure failure(cs,
-                                   getFromType(), getToType(),
-                                   getLocator());
+  UnnecessaryCoercionFailure failure(root, cs,
+                                     getFromType(), getToType(),
+                                     getLocator());
   return failure.diagnoseAsError();
 }
 
-RemoveUnecessaryCoercion
-*RemoveUnecessaryCoercion::create(ConstraintSystem &cs,
-                                  Type fromType,
-                                  Type toType,
-                                  ConstraintLocator *locator) {
+RemoveUnnecessaryCoercion
+*RemoveUnnecessaryCoercion::create(ConstraintSystem &cs,
+                                   Type fromType,
+                                   Type toType,
+                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      RemoveUnecessaryCoercion(cs, fromType, toType, locator);
+      RemoveUnnecessaryCoercion(cs, fromType, toType, locator);
 }
 
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {

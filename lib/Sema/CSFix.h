@@ -193,8 +193,8 @@ enum class FixKind : uint8_t {
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
   
-  /// Remove a unecessary coercion ('as') if the types are already equal. e.g. "Hello" as String
-  RemoveUnecessaryCoercion,
+  /// Remove a unnecessary coercion ('as') if the types are already equal. e.g. "Hello" as String
+  RemoveUnnecessaryCoercion,
 };
 
 class ConstraintFix {
@@ -1291,29 +1291,29 @@ public:
                                       ConstraintLocator *locator);
 };
 
-class RemoveUnecessaryCoercion : public ConstraintFix {
+class RemoveUnnecessaryCoercion : public ConstraintFix {
   Type fromType;
   Type toType;
   
 protected:
-  RemoveUnecessaryCoercion(ConstraintSystem &cs,
-                           Type fromType, Type toType,
-                           ConstraintLocator *locator)
-  : ConstraintFix(cs, FixKind::RemoveUnecessaryCoercion, locator, /*isWarning*/ true),
+  RemoveUnnecessaryCoercion(ConstraintSystem &cs,
+                            Type fromType, Type toType,
+                            ConstraintLocator *locator)
+  : ConstraintFix(cs, FixKind::RemoveUnnecessaryCoercion, locator, /*isWarning*/ true),
                   fromType(fromType), toType(toType) {}
 
   
 public:
-  std::string getName() const override { return "remove unecessary explicit type coercion"; }
+  std::string getName() const override { return "remove unnecessary explicit type coercion"; }
   
   Type getToType() const { return toType; }
   Type getFromType() const { return fromType; }
   
   bool diagnose(Expr *root, bool asNote = false) const override;
   
-  static RemoveUnecessaryCoercion *create(ConstraintSystem &cs,
-                                          Type fromType, Type toType,
-                                          ConstraintLocator *locator);
+  static RemoveUnnecessaryCoercion *create(ConstraintSystem &cs,
+                                           Type fromType, Type toType,
+                                           ConstraintLocator *locator);
 
 };
 
