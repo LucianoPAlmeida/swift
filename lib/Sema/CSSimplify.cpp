@@ -2799,16 +2799,15 @@ shouldDiagnoseUnnecessaryExplicitCoercion(ConstraintSystem &CS,
                                           ConstraintLocatorBuilder locator) {
   auto locatorPtr = locator.getBaseLocator();
   if (kind >= ConstraintKind::Conversion) {
-    if (locator.last().hasValue() &&
-        locator.last().getValue().getKind()
-            == ConstraintLocator::PathElementKind::ExplicitTypeCoercion) {
-      
-      return llvm::none_of(CS.getFixes(),
-                           [&locatorPtr](const ConstraintFix *fix) -> bool {
-        if (fix->getLocator() == locatorPtr)
-          return true;
-        return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
-      });
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
+        return llvm::none_of(CS.getFixes(),
+                             [&locatorPtr](const ConstraintFix *fix) -> bool {
+          if (fix->getLocator() == locatorPtr)
+            return true;
+          return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
+        });
+      }
     }
   }
   return false;
@@ -2830,7 +2829,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (desugar1->isEqual(desugar2)) {
     if (shouldDiagnoseUnnecessaryExplicitCoercion(*this, kind, locator)) {
       auto *fix = RemoveUnnecessaryCoercion::create(*this, type1, type2,
-                                                    locator.getBaseLocator());
+                                                    getConstraintLocator(locator));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
       
