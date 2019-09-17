@@ -1590,20 +1590,14 @@ public:
   bool diagnoseAsError() override;
 };
 
-class UnnecessaryCoercionFailure final : public FailureDiagnostic {
-  Type fromType;
-  Type toType;
-
+class UnnecessaryCoercionFailure final : public ContextualFailure {
 public:
   UnnecessaryCoercionFailure(Expr *root,
                              ConstraintSystem &cs,
                              Type fromType,
                              Type toType,
                              ConstraintLocator *locator)
-  : FailureDiagnostic(root, cs, locator), fromType(fromType), toType(toType) {}
-  
-  Type getToType() { return toType; }
-  Type getFromType() { return fromType; }
+  : ContextualFailure(root, cs, fromType, toType, locator) {}
   
   bool diagnoseAsError() override;
 };

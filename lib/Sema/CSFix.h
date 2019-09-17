@@ -487,8 +487,8 @@ protected:
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator, bool isWarning = false)
+      : ConstraintFix(cs, kind, locator, isWarning), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -1303,29 +1303,22 @@ public:
                                       ConstraintLocator *locator);
 };
 
-class RemoveUnnecessaryCoercion : public ConstraintFix {
-  Type fromType;
-  Type toType;
-  
+class RemoveUnnecessaryCoercion : public ContextualMismatch {
 protected:
   RemoveUnnecessaryCoercion(ConstraintSystem &cs,
                             Type fromType, Type toType,
                             ConstraintLocator *locator)
-  : ConstraintFix(cs, FixKind::RemoveUnnecessaryCoercion, locator, /*isWarning*/ true),
-                  fromType(fromType), toType(toType) {}
-
+  : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType, toType,
+                       locator, /*isWarning*/ true) {}
   
 public:
   std::string getName() const override { return "remove unnecessary explicit type coercion"; }
   
-  Type getToType() const { return toType; }
-  Type getFromType() const { return fromType; }
-  
   bool diagnose(Expr *root, bool asNote = false) const override;
   
-  static RemoveUnnecessaryCoercion *create(ConstraintSystem &cs,
-                                           Type fromType, Type toType,
-                                           ConstraintLocator *locator);
+  static bool attempt(ConstraintSystem &cs,
+                      Type fromType, Type toType,
+                      ConstraintLocatorBuilder locator);
 
 };
 

@@ -2881,26 +2881,6 @@ bool ConstraintSystem::repairFailures(
   return !conversionsOrFixes.empty();
 }
 
-static bool
-shouldDiagnoseUnnecessaryExplicitCoercion(ConstraintSystem &CS,
-                                          ConstraintKind kind,
-                                          ConstraintLocatorBuilder locator) {
-  auto locatorPtr = locator.getBaseLocator();
-  if (kind >= ConstraintKind::Conversion) {
-    if (auto last = locator.last()) {
-      if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
-        return llvm::none_of(CS.getFixes(),
-                             [&locatorPtr](const ConstraintFix *fix) -> bool {
-          if (fix->getLocator() == locatorPtr)
-            return true;
-          return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
-        });
-      }
-    }
-  }
-  return false;
-}
-
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -2922,12 +2902,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
     if (desugar1->isEqual(desugar2)) {
-      if (shouldDiagnoseUnnecessaryExplicitCoercion(*this, kind, locator)) {
-        auto *fix = RemoveUnnecessaryCoercion::create(*this, type1, type2,
-                                                      getConstraintLocator(locator));
-        if (recordFix(fix))
+      if (kind >= ConstraintKind::Conversion) {
+        if (RemoveUnnecessaryCoercion::attempt(*this, type1, type2,
+                                               getConstraintLocator(locator))) {
           return getTypeMatchFailure(locator);
-        
+        }
       }
       if (!isa<InOutType>(desugar2))
         return getTypeMatchSuccess();

@@ -761,20 +761,37 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 
 bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
-
-  UnnecessaryCoercionFailure failure(root, cs,
-                                     getFromType(), getToType(),
+  UnnecessaryCoercionFailure failure(root, cs, getFromType(), getToType(),
                                      getLocator());
   return failure.diagnoseAsError();
 }
 
-RemoveUnnecessaryCoercion
-*RemoveUnnecessaryCoercion::create(ConstraintSystem &cs,
+bool
+RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs,
                                    Type fromType,
                                    Type toType,
-                                   ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      RemoveUnnecessaryCoercion(cs, fromType, toType, locator);
+                                   ConstraintLocatorBuilder locator) {
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
+      auto *locatorPtr = cs.getConstraintLocator(locator);
+      
+      auto notHasFix = llvm::none_of(cs.getFixes(),
+                                  [&locatorPtr](const ConstraintFix *fix) -> bool {
+        if (fix->getLocator() == locatorPtr)
+          return true;
+
+        return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
+      });
+      
+      if (notHasFix) {
+        auto *fix = new (cs.getAllocator())
+              RemoveUnnecessaryCoercion(cs, fromType, toType,
+                                        cs.getConstraintLocator(locator));
+        return cs.recordFix(fix);
+      }
+    }
+  }
+  return false;
 }
 
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
