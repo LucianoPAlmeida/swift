@@ -725,6 +725,7 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
@@ -1070,7 +1071,7 @@ public:
   getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
   
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(CanType type, MangledTypeRefRole role);
+  getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
 
   std::pair<llvm::Constant *, unsigned>
   getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,
