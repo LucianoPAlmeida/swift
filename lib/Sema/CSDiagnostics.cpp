@@ -28,6 +28,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
@@ -592,14 +593,16 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
-  if (nonConformingType->isExistentialType()) {
-    auto diagnostic = diag::protocol_does_not_conform_objc;
-    if (nonConformingType->isObjCExistentialType())
-      diagnostic = diag::protocol_does_not_conform_static;
-
-    emitDiagnostic(anchor->getLoc(), diagnostic, nonConformingType,
-                   protocolType);
+  if (nonConformingType->isObjCExistentialType()) {
+    emitDiagnostic(anchor->getLoc(), diag::protocol_does_not_conform_static,
+                   nonConformingType, protocolType);
     return true;
+  }
+
+  if (diagnoseTypeCannotConform((atParameterPos ?
+                                getArgumentAt(Apply, *atParameterPos) : anchor),
+                                nonConformingType, protocolType)) {
+      return true;
   }
 
   if (atParameterPos) {
@@ -615,6 +618,58 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
   return RequirementFailure::diagnoseAsError();
+}
+
+bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
+    Type nonConformingType, Type protocolType) const {
+  if (!(nonConformingType->is<AnyFunctionType>() ||
+      nonConformingType->is<TupleType>() ||
+      nonConformingType->isExistentialType() ||
+      nonConformingType->is<AnyMetatypeType>())) {
+    return false;
+  }
+
+  emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                 nonConformingType->isExistentialType(), nonConformingType,
+                 protocolType);
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
+    auto *namingDecl = OTD->getNamingDecl();
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::required_by_opaque_return,
+                     namingDecl->getDescriptiveKind(), namingDecl->getFullName())
+          .highlight(repr->getSourceRange());
+    }
+    return true;
+  }
+
+  auto &req = getRequirement();
+  auto *reqDC = getRequirementDC();
+  auto *genericCtx = getGenericContext();
+  auto noteLocation = reqDC->getAsDecl()->getLoc();
+
+  if (!noteLocation.isValid())
+    noteLocation = anchor->getLoc();
+
+  if (isConditional()) {
+    emitDiagnostic(noteLocation, diag::requirement_implied_by_conditional_conformance,
+                   resolveType(Conformance->getType()),
+                   Conformance->getProtocol()->getDeclaredInterfaceType());
+  } else if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                                     isStaticOrInstanceMember(AffectedDecl))) {
+    emitDiagnostic(noteLocation, diag::required_by_decl_ref,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(),
+                   reqDC->getSelfNominalTypeDecl()->getDeclaredType(),
+                   req.getFirstType(), nonConformingType);
+  } else {
+    emitDiagnostic(noteLocation, diag::required_by_decl,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), req.getFirstType(),
+                   nonConformingType);
+  }
+
+  return true;
 }
 
 bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
@@ -2018,8 +2073,10 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       }
 
       // `nil` is passed as an argument to a parameter which doesn't
-      // expect it e.g. `foo(a: nil)` or `s[x: nil]`.
-      if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr))
+      // expect it e.g. `foo(a: nil)`, `s[x: nil]` or `\S.[x: nil]`.
+      // FIXME: Find a more robust way of checking this.
+      if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr) ||
+          isa<KeyPathExpr>(enclosingExpr))
         CTP = CTP_CallArgument;
     } else if (auto *CE = dyn_cast<CoerceExpr>(parentExpr)) {
       // `nil` is passed as a left-hand side of the coercion
@@ -3504,14 +3561,31 @@ bool MissingArgumentsFailure::diagnoseAsError() {
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
-  if (auto *closure = dyn_cast<ClosureExpr>(getAnchor()))
-    return diagnoseTrailingClosure(closure);
+  auto *anchor = getAnchor();
+  if (auto *captureList = dyn_cast<CaptureListExpr>(anchor))
+    anchor = captureList->getClosureBody();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor))
+    return diagnoseClosure(closure);
 
   return false;
 }
 
-bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
-  auto diff = Fn->getNumParams() - NumSynthesized;
+bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
+  auto &cs = getConstraintSystem();
+  FunctionType *funcType = nullptr;
+
+  auto *locator = getLocator();
+  if (locator->isForContextualType()) {
+    funcType = cs.getContextualType()->getAs<FunctionType>();
+  } else if (auto info = getFunctionArgApplyInfo(locator)) {
+    funcType = info->getParamType()->getAs<FunctionType>();
+  }
+
+  if (!funcType)
+    return false;
+
+  auto diff = funcType->getNumParams() - NumSynthesized;
 
   // If the closure didn't specify any arguments and it is in a context that
   // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
@@ -3521,10 +3595,10 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
                        diag::closure_argument_list_missing, NumSynthesized);
 
     std::string fixText; // Let's provide fixits for up to 10 args.
-    if (Fn->getNumParams() <= 10) {
+    if (funcType->getNumParams() <= 10) {
       fixText += " ";
       interleave(
-          Fn->getParams(),
+          funcType->getParams(),
           [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
           [&fixText] { fixText += ','; });
       fixText += " in ";
@@ -3550,9 +3624,9 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
       std::all_of(params->begin(), params->end(),
                   [](ParamDecl *param) { return !param->hasName(); });
 
-  auto diag =
-      emitDiagnostic(params->getStartLoc(), diag::closure_argument_list_tuple,
-                     resolveType(Fn), Fn->getNumParams(), diff, diff == 1);
+  auto diag = emitDiagnostic(
+      params->getStartLoc(), diag::closure_argument_list_tuple,
+      resolveType(funcType), funcType->getNumParams(), diff, diff == 1);
 
   // If the number of parameters is less than number of inferred
   // let's try to suggest a fix-it with the rest of the missing parameters.

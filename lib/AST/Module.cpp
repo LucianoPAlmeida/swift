@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
@@ -33,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -101,6 +103,8 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
+      TAD->setValidationToChecked();
+      TAD->computeType();
       Entry = TAD;
     }
   }

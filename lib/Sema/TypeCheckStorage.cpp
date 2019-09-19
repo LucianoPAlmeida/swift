@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 using namespace swift;
@@ -268,8 +269,9 @@ void swift::validatePatternBindingEntries(TypeChecker &tc,
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -297,7 +299,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -323,8 +325,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -2349,8 +2352,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
-      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
+      ctx, var->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/ nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 

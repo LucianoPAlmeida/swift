@@ -29,6 +29,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Dwarf.h"
@@ -2797,7 +2798,7 @@ public:
 
     auto contextID = S.addDeclContextRef(typeAlias->getDeclContext());
 
-    auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlying = typeAlias->getUnderlyingType();
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
@@ -3717,7 +3718,7 @@ public:
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlyingType = typeAlias->getUnderlyingType();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(

@@ -290,6 +290,10 @@ protected:
            isa<BinaryExpr>(apply);
   }
 
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
+
 private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
@@ -298,10 +302,6 @@ private:
   GenericSignature *getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
-
-  /// Determine whether given declaration represents a static
-  /// or instance property/method, excluding operators.
-  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -346,6 +346,10 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
+
+private:
+  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+                                 Type protocolType) const;
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -1182,23 +1186,19 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          FunctionType *funcType,
-                          unsigned numSynthesized,
-                          ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Fn(funcType),
-        NumSynthesized(numSynthesized) {}
+                          unsigned numSynthesized, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NumSynthesized(numSynthesized) {}
 
   bool diagnoseAsError() override;
 
 private:
-  /// If missing arguments come from trailing closure,
+  /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseTrailingClosure(ClosureExpr *closure);
+  bool diagnoseClosure(ClosureExpr *closure);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {

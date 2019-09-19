@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -4198,7 +4199,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= UnderlyingTy;
   }
 
-  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
+  TAD->setUnderlyingTypeRepr(UnderlyingTy.getPtrOrNull());
   TAD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.

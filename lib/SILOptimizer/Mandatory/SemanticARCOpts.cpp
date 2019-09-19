@@ -671,12 +671,12 @@ public:
     }
     
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    
-    auto result = valueHasLinearLifetime(baseObject, baseEndBorrows,
-                                   valueDestroys, visitedBlocks,
-                                   ARCOpt.getDeadEndBlocks(),
-                                   ownership::ErrorBehaviorKind::ReturnFalse);
-    return answer(result.getFoundError());
+
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    // Returns true on success. So we invert.
+    bool foundError =
+        !checker.validateLifetime(baseObject, baseEndBorrows, valueDestroys);
+    return answer(foundError);
   }
   
   // TODO: Handle other access kinds?
