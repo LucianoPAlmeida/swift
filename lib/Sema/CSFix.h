@@ -193,7 +193,7 @@ enum class FixKind : uint8_t {
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
   
-  /// Remove a unnecessary coercion ('as') if the types are already equal. e.g. Double(1) as Double
+  /// Remove an unnecessary coercion ('as') if the types are already equal. e.g. Double(1) as Double
   RemoveUnnecessaryCoercion,
 
   /// Allow a single argument type mismatch. This is the most generic

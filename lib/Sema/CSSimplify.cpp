@@ -2893,7 +2893,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
-
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic generic parameter,
@@ -3052,7 +3051,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                          formUnsolvedResult);
         }
       }
-
       return formUnsolvedResult();
     }
 
@@ -7912,21 +7910,16 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto coerceLocator = [&]() {
-    if (allowFixes && shouldAttemptFixes()) {
-      if (auto *expr = dyn_cast_or_null<CoerceExpr>(locator.getAnchor())) {
-        auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
-        // Only adding this path for explicty coercions e.g _ = a as Int
-        // and also only for left-side is a DeclRefExpr or a
-        // explicit/implicit coercion e.g. Double(1) as Double
-        if (!expr->isImplicit() &&
-            !isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
-            (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr())))
-          return getConstraintLocator(expr, LocatorPathElt::ExplicitTypeCoercion());
-      }
+  ConstraintLocator *coerceLocator = locatorPtr;
+  
+  if (allowFixes && shouldAttemptFixes()) {
+    if (isa<CoerceExpr>(locator.getAnchor()) &&
+        !locator.getAnchor()->isImplicit()) {
+      coerceLocator = getConstraintLocator(locator.getAnchor(),
+                                           LocatorPathElt::ExplicitTypeCoercion());
     }
-    return locatorPtr;
-  }();
+  }
+
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,

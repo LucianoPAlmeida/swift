@@ -773,21 +773,22 @@ RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs,
                                    ConstraintLocatorBuilder locator) {
   if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
-      auto *locatorPtr = cs.getConstraintLocator(locator);
       
-      auto notHasFix = llvm::none_of(cs.getFixes(),
-                                  [&locatorPtr](const ConstraintFix *fix) -> bool {
-        if (fix->getLocator() == locatorPtr)
-          return true;
-
-        return fix->getLocator()->getAnchor() == locatorPtr->getAnchor();
-      });
+      auto expr = cast<CoerceExpr>(locator.getAnchor());
+      auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
       
-      if (notHasFix) {
-        auto *fix = new (cs.getAllocator())
-              RemoveUnnecessaryCoercion(cs, fromType, toType,
-                                        cs.getConstraintLocator(locator));
-        return cs.recordFix(fix);
+      // only diagnosing for coercion where the left-side is a DeclRefExpr
+      // or a explicit/implicit coercion e.g. Double(1) as Double
+      if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
+          (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr()))) {
+        
+        auto *locatorPtr = cs.getConstraintLocator(locator);
+        if (!cs.hasFixFor(locatorPtr)) {
+          auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
+              cs, fromType, toType, locatorPtr);
+          
+          return cs.recordFix(fix);
+        }
       }
     }
   }

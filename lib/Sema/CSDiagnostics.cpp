@@ -4418,28 +4418,31 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 
 bool UnnecessaryCoercionFailure::diagnoseAsError() {
   auto expr = cast<CoerceExpr>(getAnchor());
+  auto sourceRange = SourceRange(expr->getLoc(),
+                                 expr->getCastTypeLoc().getSourceRange().End);
   
-  auto diag = [&]() {
-    if (isa<TypeAliasType>(getFromType().getPointer()) &&
-        isa<TypeAliasType>(getToType().getPointer())) {
-      auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
-      auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
-      // If the typealias are the same, we don't need a warning
-      // mentioning both types.
-      if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
-        return emitDiagnostic(expr->getLoc(),
-                              diag::unnecessary_same_typealias_type_coercion,
-                              getFromType(), getToType());
-      }
+  if (isa<TypeAliasType>(getFromType().getPointer()) &&
+      isa<TypeAliasType>(getToType().getPointer())) {
+    auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
+    auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
+    // If the typealias are different, we need a warning
+    // mentioning both types.
+    if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
+      emitDiagnostic(expr->getLoc(),
+                     diag::unnecessary_same_typealias_type_coercion,
+                     getFromType(), getToType())
+      
+          .fixItRemove(sourceRange);
+    } else {
+      emitDiagnostic(expr->getLoc(),
+                     diag::unnecessary_same_type_coercion, getToType())
+          .fixItRemove(sourceRange);
     }
-    return emitDiagnostic(expr->getLoc(),
-                          diag::unnecessary_same_type_coercion, getToType());
-    
-  }();
-  
-  diag.fixItRemove(SourceRange(expr->getLoc(),
-                               expr->getCastTypeLoc().getSourceRange().End));
-  
+  } else {
+    emitDiagnostic(expr->getLoc(),
+                   diag::unnecessary_same_type_coercion, getToType())
+        .fixItRemove(sourceRange);
+  }
   return true;
 }
 
