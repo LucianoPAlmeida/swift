@@ -763,7 +763,7 @@ bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   UnnecessaryCoercionFailure failure(root, cs, getFromType(), getToType(),
                                      getLocator());
-  return failure.diagnoseAsError();
+  return failure.diagnose(asNote);
 }
 
 bool
@@ -783,7 +783,9 @@ RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs,
           (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr()))) {
         
         auto *locatorPtr = cs.getConstraintLocator(locator);
-        if (!cs.hasFixFor(locatorPtr)) {
+        // If the constraint system has a baseCS here, it's probably coming from
+        // a re-type check and this fix was already emitted, so we skip it here.
+        if (!cs.hasFixFor(locatorPtr) && !cs.baseCS) {
           auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
               cs, fromType, toType, locatorPtr);
           
