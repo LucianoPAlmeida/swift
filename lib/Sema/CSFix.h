@@ -1318,7 +1318,23 @@ public:
   static bool attempt(ConstraintSystem &cs,
                       Type fromType, Type toType,
                       ConstraintLocatorBuilder locator);
+};
 
+class IgnoreAssignmentDestinationType final : public ContextualMismatch {
+  IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
+                                  Type destTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, sourceTy, destTy, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore type of the assignment destination";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
+                                                 Type sourceTy, Type destTy,
+                                                 ConstraintLocator *locator);
 };
 
 /// If this is an argument-to-parameter conversion which is associated with

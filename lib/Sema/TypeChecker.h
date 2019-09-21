@@ -219,6 +219,8 @@ enum ContextualTypePurpose {
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
   CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
                              ///< result type.
+  CTP_Condition,        ///< Condition expression of various statements e.g.
+                        ///< `if`, `for`, `while` etc.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
@@ -1011,10 +1013,6 @@ public:
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
-  }
-
-  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {
-    validateDecl(proto);
   }
 
   virtual void resolveExtension(ExtensionDecl *ext) override {
