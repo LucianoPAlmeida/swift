@@ -137,7 +137,7 @@ public:
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
-    /// A explicit type coercion
+    /// An explicit type coercion
     ExplicitTypeCoercion,
   };
 

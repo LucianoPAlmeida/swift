@@ -766,29 +766,26 @@ bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
-bool
-RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs,
-                                   Type fromType,
-                                   Type toType,
-                                   ConstraintLocatorBuilder locator) {
+bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
+                                        Type toType,
+                                        ConstraintLocatorBuilder locator) {
   if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
-      
       auto expr = cast<CoerceExpr>(locator.getAnchor());
       auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
-      
+
       // only diagnosing for coercion where the left-side is a DeclRefExpr
       // or a explicit/implicit coercion e.g. Double(1) as Double
       if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
-          (isa<DeclRefExpr>(expr->getSubExpr()) || isa<CoerceExpr>(expr->getSubExpr()))) {
-        
+          (isa<DeclRefExpr>(expr->getSubExpr()) ||
+           isa<CoerceExpr>(expr->getSubExpr()))) {
         auto *locatorPtr = cs.getConstraintLocator(locator);
         // If the constraint system has a baseCS here, it's probably coming from
         // a re-type check and this fix was already emitted, so we skip it here.
         if (!cs.hasFixFor(locatorPtr) && !cs.baseCS) {
-          auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
-              cs, fromType, toType, locatorPtr);
-          
+          auto *fix = new (cs.getAllocator())
+              RemoveUnnecessaryCoercion(cs, fromType, toType, locatorPtr);
+
           return cs.recordFix(fix);
         }
       }

@@ -1590,14 +1590,23 @@ public:
   bool diagnoseAsError() override;
 };
 
-class UnnecessaryCoercionFailure final : public ContextualFailure {
+/// Diagnose a situation where there is an explicit type coercion
+/// to the same type e.g.:
+///
+/// ```swift
+/// Double(1) as Double // redundant cast to 'Double' has no effect
+/// 1 as Double as Double // redundant cast to 'Double' has no effect
+/// let string = "String"
+/// let s = string as String // redundant cast to 'String' has no effect
+/// ```
+class UnnecessaryCoercionFailure final
+    : public ContextualFailure {
+      
 public:
-  UnnecessaryCoercionFailure(Expr *root,
-                             ConstraintSystem &cs,
-                             Type fromType,
-                             Type toType,
+  UnnecessaryCoercionFailure(Expr *root, ConstraintSystem &cs,
+                             Type fromType, Type toType,
                              ConstraintLocator *locator)
-  : ContextualFailure(root, cs, fromType, toType, locator) {}
+      : ContextualFailure(root, cs, fromType, toType, locator) {}
   
   bool diagnoseAsError() override;
 };
