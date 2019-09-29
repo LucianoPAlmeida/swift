@@ -1120,9 +1120,10 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
     if (isType != isa<TypeDecl>(value))
       return true;
-    if (!value->hasInterfaceType())
+    auto ifaceTy = value->getInterfaceType();
+    if (!ifaceTy)
       return true;
-    if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
+    if (canTy && ifaceTy->getCanonicalType() != canTy)
       return true;
     if (value->isStatic() != isStatic)
       return true;
@@ -3293,9 +3294,12 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
-        ctx.AllocateCopy(designatedNominalTypes));
-
+        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+    result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
+    ctx.evaluator.cacheOutput(
+        OperatorPrecedenceGroupRequest{result},
+        std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
+    
     declOrOffset = result;
     return result;
   }

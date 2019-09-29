@@ -329,18 +329,12 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
-  // If the witness has not been validated yet, do so now.
-  if (!witness->hasValidSignature()) {
-    auto &ctx = dc->getASTContext();
-    ctx.getLazyResolver()->resolveDeclSignature(witness);
-  }
-
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->hasValidSignature())
+  if (!witness->getInterfaceType())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -1543,8 +1537,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   conformance->setState(ProtocolConformanceState::Checking);
   SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
-  TC.validateDecl(Proto);
-
+  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface
+  // type.
+  (void)Proto->getInterfaceType();
+  
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
     conformance->setInvalid();
@@ -2205,11 +2201,7 @@ ConformanceChecker::ConformanceChecker(
       Conformance(conformance), Loc(conformance->getLoc()),
       GlobalMissingWitnesses(GlobalMissingWitnesses),
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
-      SuppressDiagnostics(suppressDiagnostics) {
-  // The protocol may have only been validatedDeclForNameLookup'd until
-  // here, so fill in any information that's missing.
-  tc.validateDecl(conformance->getProtocol());
-}
+      SuppressDiagnostics(suppressDiagnostics) { }
 
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
@@ -2323,7 +2315,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   if (!classDecl->usesObjCGenericsModel()) return false;
 
   // Concrete types are okay.
-  if (!type->hasTypeParameter()) return false;
+  if (!type->getCanonicalType()->hasTypeParameter()) return false;
 
   // Find one of the generic parameters named. It doesn't matter
   // which one.
@@ -3854,11 +3846,8 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // Make sure we've validated the requirement.
-    if (!requirement->hasInterfaceType())
-      TC.validateDecl(requirement);
-
-    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+    // Make sure we've got an interface type.
+    if (!requirement->getInterfaceType() || requirement->isInvalid()) {
       Conformance->setInvalid();
       continue;
     }

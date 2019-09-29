@@ -551,8 +551,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinBridgeObjectType(*this)),
-    TheUnknownObjectType(new (*this, AllocationArena::Permanent)
-                         BuiltinUnknownObjectType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)
                         BuiltinRawPointerType(*this)),
     TheUnsafeValueBufferType(new (*this, AllocationArena::Permanent)
@@ -922,8 +920,8 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
   ctx.lookupInSwiftModule(name, results);
   if (results.size() == 1) {
     if (auto FD = dyn_cast<FuncDecl>(results.front())) {
-      if (auto *resolver = ctx.getLazyResolver())
-        resolver->resolveDeclSignature(FD);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)FD->getInterfaceType();
       return FD;
     }
   }
@@ -986,9 +984,6 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
       auto contextTy = fnDecl->getDeclContext()->getDeclaredInterfaceType();
       if (!contextTy->isEqual(contextType)) continue;
     }
-
-    if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveDeclSignature(fnDecl);
 
     auto *funcTy = getIntrinsicCandidateType(fnDecl, /*allowTypeMembers=*/true);
     if (!funcTy)
@@ -2180,18 +2175,11 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
-  auto storedProperties = properties;
-  if (parent) {
+  if (parent)
     properties |= parent->getRecursiveProperties();
-    if (parent->hasTypeVariable())
-      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
-  }
 
-  for (auto substGP : substitutions.getReplacementTypes()) {
+  for (auto substGP : substitutions.getReplacementTypes())
     properties |= substGP->getRecursiveProperties();
-    if (substGP->hasTypeVariable())
-      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
-  }
 
   // Figure out which arena this type will go into.
   auto &ctx = underlying->getASTContext();
@@ -2213,7 +2201,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
                                                       genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);
   auto result = new (mem) TypeAliasType(typealias, parent, substitutions,
-                                        underlying, storedProperties);
+                                        underlying, properties);
   types.InsertNode(result, insertPos);
   return result;
 }
@@ -3969,8 +3957,6 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
 
     // Look through typealiases.
     if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
-      if (auto resolver = ctx.getLazyResolver())
-        resolver->resolveDeclSignature(typealias);
       return typealias->getDeclaredInterfaceType()->getAnyNominal();
     }
   }

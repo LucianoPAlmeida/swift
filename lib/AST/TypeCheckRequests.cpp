@@ -564,11 +564,6 @@ void swift::simple_display(
     out << propertyWrapper.valueVar->printRef();
   else
     out << "null";
-  out << ", ";
-  if (propertyWrapper.wrappedValueInit)
-    out << propertyWrapper.wrappedValueInit->printRef();
-  else
-    out << "null";
   out << " }";
 }
 
@@ -832,7 +827,7 @@ void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// GenericSignatureRequest computation.
+// InferredGenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {

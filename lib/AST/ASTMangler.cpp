@@ -155,6 +155,14 @@ std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
+                                                       SymbolKind SKind) {
+  beginMangling();
+  appendBackingInitializerEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
   appendAnyGenericType(decl);
@@ -794,8 +802,6 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return appendOperator("Bo");
     case TypeKind::BuiltinBridgeObject:
       return appendOperator("Bb");
-    case TypeKind::BuiltinUnknownObject:
-      return appendOperator("BO");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::SILToken:
@@ -814,10 +820,16 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       // It's not possible to mangle the context of the builtin module.
       // For the DWARF output we want to mangle the type alias + context,
       // unless the type alias references a builtin type.
+      auto underlyingType = aliasTy->getSinglyDesugaredType();
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        return appendType(aliasTy->getSinglyDesugaredType(),
-                          forDecl);
+        return appendType(underlyingType, forDecl);
+      }
+
+      if (decl->getDeclaredInterfaceType()
+            .subst(aliasTy->getSubstitutionMap()).getPointer()
+            != aliasTy) {
+        return appendType(underlyingType, forDecl);
       }
 
       if (aliasTy->getSubstitutionMap()) {
@@ -2328,6 +2340,11 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
   appendOperator("fi");
 }
 
+void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
+  appendEntity(var, "vp", var->isStatic());
+  appendOperator("fP");
+}
+
 /// Is this declaration a method for mangling purposes? If so, we'll leave the
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
@@ -2343,13 +2360,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = nullptr;
 
   auto &C = decl->getASTContext();
-  if (!decl->hasInterfaceType() && !decl->getDeclContext()->isLocalContext()) {
-    if (auto *resolver = C.getLazyResolver()) {
-      resolver->resolveDeclSignature(const_cast<ValueDecl *>(decl));
-    }
-  }
-
-  if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
+  if (!decl->getInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
                                   C.TheErrorType);

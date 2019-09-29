@@ -68,8 +68,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
-    validateDecl(protocol);
+  if (protocol && !protocol->getInterfaceType()) {
     if (protocol->isInvalid())
       return nullptr;
   }
@@ -352,12 +351,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
-  // Eagerly build a scope tree before type checking
-  // because type-checking mutates the AST and that throws off the scope-based
-  // lookups.
+  // Eagerly build the top-level scopes tree before type checking
+  // because type-checking expressions mutates the AST and that throws off the
+  // scope-based lookups. Only the top-level scopes because extensions have not
+  // been bound yet.
   if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
       SF.isSuitableForASTScopes())
-    SF.getScope().buildScopeTreeEagerly();
+    SF.getScope()
+        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
@@ -391,6 +392,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
+
+    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (!SF.getParentModule()->isOnoneSupportModule())
+        TC.setSkipNonInlinableBodies(true);
 
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
@@ -612,12 +620,16 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-
-  if (auto ext = dyn_cast<ExtensionDecl>(D))
-    TC.validateExtension(ext);
-  else
-    TC.validateDecl(cast<ValueDecl>(D));
+  (void)createTypeChecker(Ctx);
+  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *nominal = ext->getExtendedNominal()) {
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)nominal->getInterfaceType();
+    }
+  } else {
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)cast<ValueDecl>(D)->getInterfaceType();
+  }
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

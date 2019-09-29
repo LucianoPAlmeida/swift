@@ -622,7 +622,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
 Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
-  assert(!type->hasTypeParameter());
+  assert(!type->getCanonicalType()->hasTypeParameter());
 
   checkNestedTypeConstraints(*this, type, locator);
 
@@ -819,7 +819,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
         if (auto *param = dyn_cast<ParamDecl>(var))
           return getType(param);
 
-        if (!var->hasValidSignature()) {
+        if (!var->hasInterfaceType()) {
           if (!var->isInvalid()) {
             TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
                         var->getDescriptiveKind(), var->getName());
@@ -1463,7 +1463,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type) {
-    decl->getASTContext().getLazyResolver()->resolveDeclSignature(decl);
     type = decl->getInterfaceType();
     if (!type) {
       return Type();
@@ -2913,11 +2912,12 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(elt.getArgIdx() == 0);
-
-        anchor = parenExpr->getSubExpr();
-        path = path.slice(1);
-        continue;
+        // This simplication request could be for a synthesized argument.
+        if (elt.getArgIdx() == 0) {
+          anchor = parenExpr->getSubExpr();
+          path = path.slice(1);
+          continue;
+        }
       }
       break;
     }

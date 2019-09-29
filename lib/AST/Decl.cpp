@@ -470,16 +470,24 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   return Range;
 }
 
-SourceLoc Decl::getLoc() const {
+SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
-static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 1, \
-              #ID "Decl is missing getLoc()"); \
-case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getLocFromSource)) == 1, \
+              #ID "Decl is missing getLocFromSource()"); \
+case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
 #include "swift/AST/DeclNodes.def"
   }
 
   llvm_unreachable("Unknown decl kind");
+}
+
+SourceLoc Decl::getLoc() const {
+#define DECL(ID, X) \
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
+              #ID "Decl is re-defining getLoc()");
+#include "swift/AST/DeclNodes.def"
+  return getLocFromSource();
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -2697,7 +2705,13 @@ bool ValueDecl::hasInterfaceType() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  assert(hasInterfaceType() && "No interface type was set");
+  if (!hasInterfaceType()) {
+    // Our clients that don't register the lazy resolver are relying on the
+    // fact that they can't pull an interface type out to avoid doing work.
+    // This is a necessary evil until we can wean them off.
+    if (auto resolver = getASTContext().getLazyResolver())
+      resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
+  }
   return TypeAndAccess.getPointer();
 }
 
@@ -2718,14 +2732,6 @@ void ValueDecl::setInterfaceType(Type type) {
   }
 
   TypeAndAccess.setPointer(type);
-}
-
-bool ValueDecl::hasValidSignature() const {
-  if (!hasInterfaceType())
-    return false;
-  // FIXME -- The build blows up if the correct code is used:
-  // return getValidationState() > ValidationState::CheckingWithValidSignature;
-  return getValidationState() != ValidationState::Checking;
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
@@ -3249,14 +3255,11 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = hasInterfaceType() ? getInterfaceType() : nullptr;
-  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
-    return interfaceType;
+  Type interfaceType = getInterfaceType();
+  if (!interfaceType)
+    return ErrorType::get(getASTContext());
 
-  if (isa<ModuleDecl>(this))
-    return interfaceType;
-
-  return interfaceType->castTo<MetatypeType>()->getInstanceType();
+  return interfaceType->getMetatypeInstanceType();
 }
 
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
@@ -3547,15 +3550,16 @@ void TypeAliasDecl::computeType() {
   Type parent;
   auto parentDC = getDeclContext();
   if (parentDC->isTypeContext())
-    parent = parentDC->getDeclaredInterfaceType();
+    parent = parentDC->getSelfInterfaceType();
   auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
   setInterfaceType(MetatypeType::get(sugaredType, ctx));
 }
 
 Type TypeAliasDecl::getUnderlyingType() const {
-  return evaluateOrDefault(getASTContext().evaluator,
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
            UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
-           Type());
+           ErrorType::get(ctx));
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
@@ -3585,10 +3589,11 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
-  auto &context = getASTContext();
+  auto &ctx = getASTContext();
   return evaluateOrDefault(
-      context.evaluator,
-      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)}, Type());
+      ctx.evaluator,
+      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+      ErrorType::get(ctx));
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -5484,7 +5489,8 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return !getAttachedPropertyWrappers().empty();
 }
 
-/// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+/// Whether all of the attached property wrappers have an init(wrappedValue:)
+/// initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
@@ -6557,17 +6563,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
 
-  // FIXME: Remove this once getInterfaceType() has been request-ified.
-  if (!decl->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(decl));
-  }
-
-  if (!base->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(base));
-  }
-
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
   // change is OK; we don't want to add a whole new vtable entry just
@@ -7482,6 +7477,28 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
+}
+
+llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
+  auto *dc = descriptor.dc;
+  PrecedenceGroupDecl *group = nullptr;
+  if (auto sf = dc->getParentSourceFile()) {
+    bool cascading = dc->isCascadingContextForLookup(false);
+    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
+                                      descriptor.nameLoc);
+  } else {
+    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
+                                                         descriptor.nameLoc);
+  }
+  return group;
+}
+
+PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      OperatorPrecedenceGroupRequest{const_cast<InfixOperatorDecl *>(this)},
+      nullptr);
 }
 
 bool FuncDecl::isDeferBody() const {
