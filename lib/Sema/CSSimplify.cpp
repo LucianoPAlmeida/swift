@@ -2819,6 +2819,28 @@ bool ConstraintSystem::repairFailures(
     if (lhs->is<InOutType>() || rhs->is<InOutType>())
       break;
 
+    // If this is a failure from a explicit coercion where
+    // both types are BoundedGeneric, try to diagnose the generic mismatch.
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
+        if (lhs->is<BoundGenericType>() && rhs->is<BoundGenericType>()) {
+          SmallVector<unsigned, 4> mismatches;
+          auto result =
+              matchDeepTypeArguments(*this, TMF_ApplyingFix, lhs, rhs, locator,
+                                     [&mismatches](unsigned position) {
+                                       mismatches.push_back(position);
+                                     });
+
+          if (result.isFailure() && !mismatches.empty()) {
+            auto *fix = GenericArgumentsMismatch::create(
+                *this, lhs, rhs, mismatches, getConstraintLocator(locator));
+            conversionsOrFixes.push_back(fix);
+            break;
+          }
+        }
+      }
+    }
+
     // If there is a deep equality, superclass restriction
     // already recorded, let's not add bother ignoring
     // contextual type, because actual fix is going to
@@ -3379,6 +3401,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                subflags, locator);
       if (result.isSuccess() || !shouldAttemptFixes())
         return result;
+    }
+
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::ExplicitTypeCoercion>() &&
+          !type2->isExistentialType()) {
+        // At this point both desugared types are different,
+        // so this fix it to diagnose a failure conversion.
+        auto *fix = ForceDowncast::create(
+            *this, type1, type2, getConstraintLocator(locator));
+        conversionsOrFixes.push_back(fix);
+      }
     }
   }
 
@@ -7945,12 +7978,12 @@ void ConstraintSystem::addExplicitConversionConstraint(
 
   auto locatorPtr = getConstraintLocator(locator);
   ConstraintLocator *coerceLocator = locatorPtr;
-  
+
   if (allowFixes && shouldAttemptFixes()) {
     if (isa<CoerceExpr>(locator.getAnchor()) &&
         !locator.getAnchor()->isImplicit()) {
-      coerceLocator = getConstraintLocator(locator.getAnchor(),
-                                           LocatorPathElt::ExplicitTypeCoercion());
+      coerceLocator = getConstraintLocator(
+          locator.getAnchor(), LocatorPathElt::ExplicitTypeCoercion());
     }
   }
 

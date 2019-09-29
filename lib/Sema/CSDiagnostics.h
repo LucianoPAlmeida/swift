@@ -156,7 +156,11 @@ protected:
   }
 
   /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const { return HasComplexLocator; }
+  bool hasComplexLocator() const {
+    bool isExplicitCoercion = getLocator()->isLastElement(
+        ConstraintLocator::PathElementKind::ExplicitTypeCoercion);
+    return HasComplexLocator && !isExplicitCoercion;
+  }
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
@@ -610,8 +614,8 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
-  // If we're trying to convert something of type "() -> T" to T,
-  // then we probably meant to call the value.
+  /// If we're trying to convert something of type "() -> T" to T,
+  /// then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.

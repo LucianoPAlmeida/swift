@@ -779,15 +779,10 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
       if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
           (isa<DeclRefExpr>(expr->getSubExpr()) ||
            isa<CoerceExpr>(expr->getSubExpr()))) {
-        auto *locatorPtr = cs.getConstraintLocator(locator);
-        // If the constraint system has a baseCS here, it's probably coming from
-        // a re-type check and this fix was already emitted, so we skip it here.
-        if (!cs.hasFixFor(locatorPtr) && !cs.baseCS) {
-          auto *fix = new (cs.getAllocator())
-              RemoveUnnecessaryCoercion(cs, fromType, toType, locatorPtr);
+        auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
+            cs, fromType, toType, cs.getConstraintLocator(locator));
 
-          return cs.recordFix(fix);
-        }
+        return cs.recordFix(fix);
       }
     }
   }
