@@ -1497,7 +1497,7 @@ public:
   TrailingWhereClause *TrailingWhere = nullptr;
 
   /// The generic signature of this declaration.
-  llvm::PointerIntPair<GenericSignature *, 1, bool> GenericSigAndBit;
+  llvm::PointerIntPair<GenericSignature, 1, bool> GenericSigAndBit;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
@@ -1541,7 +1541,7 @@ public:
   }
 
   /// Retrieve the generic signature for this context.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Retrieve the generic context for this context.
   GenericEnvironment *getGenericEnvironment() const;
@@ -1553,7 +1553,7 @@ public:
   ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Set the generic signature of this context.
-  void setGenericSignature(GenericSignature *genericSig);
+  void setGenericSignature(GenericSignature genericSig);
 
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
@@ -1678,7 +1678,11 @@ class ExtensionDecl final : public GenericContext, public Decl,
   TypeRepr *ExtendedTypeRepr;
 
   /// The nominal type being extended.
-  NominalTypeDecl *ExtendedNominal = nullptr;
+  ///
+  /// The bit indicates whether binding has been attempted. The pointer can be
+  /// null if either no binding was attempted or if binding could not find  the
+  /// extended nominal.
+  llvm::PointerIntPair<NominalTypeDecl *, 1, bool> ExtendedNominal;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1738,6 +1742,12 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  bool hasBeenBound() const { return ExtendedNominal.getInt(); }
+
+  void setExtendedNominal(NominalTypeDecl *n) {
+    ExtendedNominal.setPointerAndInt(n, true);
+  }
+
   /// Retrieve the type being extended.
   ///
   /// Only use this entry point when the complete type, as spelled in the source,
@@ -1746,7 +1756,20 @@ public:
   Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
+  /// Will  trip an assertion if the declaration has not already been computed.
+  /// In order to fail fast when type checking work is attempted
+  /// before extension binding has taken place.
+
   NominalTypeDecl *getExtendedNominal() const;
+
+  /// Compute the nominal type declaration that is being extended.
+  NominalTypeDecl *computeExtendedNominal() const;
+
+  /// \c hasBeenBound means nothing if this extension can never been bound
+  /// because it is not at the top level.
+  bool canNeverBeBound() const;
+
+  bool hasValidParent() const;
 
   /// Determine whether this extension has already been bound to a nominal
   /// type declaration.
@@ -2857,7 +2880,7 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   /// The generic signature of the opaque interface to the type. This is the
   /// outer generic signature with an added generic parameter representing the
   /// underlying type.
-  GenericSignature *OpaqueInterfaceGenericSignature;
+  GenericSignature OpaqueInterfaceGenericSignature;
   
   /// The generic parameter that represents the underlying type.
   GenericTypeParamType *UnderlyingInterfaceType;
@@ -2874,7 +2897,7 @@ public:
   OpaqueTypeDecl(ValueDecl *NamingDecl,
                  GenericParamList *GenericParams,
                  DeclContext *DC,
-                 GenericSignature *OpaqueInterfaceGenericSignature,
+                 GenericSignature OpaqueInterfaceGenericSignature,
                  GenericTypeParamType *UnderlyingInterfaceType);
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
@@ -2890,7 +2913,7 @@ public:
   /// function could also be the getter of a storage declaration.
   bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
 
-  GenericSignature *getOpaqueInterfaceGenericSignature() const {
+  GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
   

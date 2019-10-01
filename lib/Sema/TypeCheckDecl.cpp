@@ -618,7 +618,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  auto *sig = TypeChecker::checkGenericSignature(
+  auto sig = TypeChecker::checkGenericSignature(
              nestedList.back(), DC,
              /*parentSig=*/nullptr,
              /*allowConcreteGenericParams=*/true);
@@ -2963,9 +2963,9 @@ public:
       // requirement signatures are necessarily missing requirements.
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
-        GenericSignature::getCanonical(requirementsSig->getGenericParams(),
-                                       requirementsSig->getRequirements(),
-                                       /*skipValidation=*/true);
+        CanGenericSignature::getCanonical(requirementsSig->getGenericParams(),
+                                          requirementsSig->getRequirements(),
+                                          /*skipValidation=*/true);
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
@@ -3130,7 +3130,7 @@ public:
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
-    auto nominal = ED->getExtendedNominal();
+    auto nominal = ED->computeExtendedNominal();
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
