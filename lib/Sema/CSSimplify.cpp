@@ -8108,10 +8108,9 @@ void ConstraintSystem::addExplicitConversionConstraint(
 
   if (allowFixes && shouldAttemptFixes()) {
     auto *anchor = locator.getAnchor();
-    if (isa<CoerceExpr>(anchor) &&
-        !anchor->isImplicit()) {
-      coerceLocator = getConstraintLocator(
-          anchor, LocatorPathElt::ExplicitTypeCoercion());
+    if (isa<CoerceExpr>(anchor) && !anchor->isImplicit()) {
+      coerceLocator =
+          getConstraintLocator(anchor, LocatorPathElt::ExplicitTypeCoercion());
     }
   }
 
