@@ -178,13 +178,15 @@ namespace {
       return IR;
     }
 
+    ImportResult VisitType(const Type*) = delete;
+
 #define DEPENDENT_TYPE(Class, Base)                               \
     ImportResult Visit##Class##Type(const clang::Class##Type *) { \
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
-    
+
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
@@ -318,9 +320,29 @@ namespace {
       // OpenMP types that don't have Swift equivalents.
       case clang::BuiltinType::OMPArraySection:
         return Type();
+
+      // SVE builtin types that don't have Swift equivalents.
+      case clang::BuiltinType::SveInt8:
+      case clang::BuiltinType::SveInt16:
+      case clang::BuiltinType::SveInt32:
+      case clang::BuiltinType::SveInt64:
+      case clang::BuiltinType::SveUint8:
+      case clang::BuiltinType::SveUint16:
+      case clang::BuiltinType::SveUint32:
+      case clang::BuiltinType::SveUint64:
+      case clang::BuiltinType::SveFloat16:
+      case clang::BuiltinType::SveFloat32:
+      case clang::BuiltinType::SveFloat64:
+      case clang::BuiltinType::SveBool:
+        return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
+    }
+
+    ImportResult VisitPipeType(const clang::PipeType *) {
+      // OpenCL types are not supported in Swift.
+      return Type();
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
@@ -768,12 +790,11 @@ namespace {
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(TemplateSpecialization)
     SUGAR_TYPE(Auto)
+    SUGAR_TYPE(DeducedTemplateSpecialization)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(PackExpansion)
-
-    ImportResult VisitAttributedType(const clang::AttributedType *type) {
-      return Visit(type->desugar());
-    }
+    SUGAR_TYPE(Attributed)
+    SUGAR_TYPE(MacroQualified)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -1699,11 +1720,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
-        param, AccessLevel::Private,
-        ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
+        param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo,
                                 importedType.isImplicitlyUnwrapped());
@@ -1717,11 +1737,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
                               {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto param = new (SwiftContext) ParamDecl(ParamDecl::Specifier::Default,
-                                              SourceLoc(), SourceLoc(),
+    auto param = new (SwiftContext) ParamDecl(SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
                                               name,
                                               ImportedHeaderUnit);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(paramTy);
 
     param->setVariadic();
@@ -1778,7 +1798,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     const clang::EnumDecl *enumDef = enumTy->getDecl()->getDefinition();
     if (enumDef && nameImporter.getEnumKind(enumDef) == EnumKind::Options) {
       auto enumName = enumDef->getName();
-      for (auto word : reversed(camel_case::getWords(enumName))) {
+      for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
           return DefaultArgumentKind::EmptyArray;
       }
@@ -1800,7 +1820,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           emptyDictionaryKind = DefaultArgumentKind::NilLiteral;
 
         bool sawInfo = false;
-        for (auto word : reversed(camel_case::getWords(searchStr))) {
+        for (auto word : llvm::reverse(camel_case::getWords(searchStr))) {
           if (camel_case::sameWordIgnoreFirstCase(word, "options"))
             return emptyDictionaryKind;
 
@@ -2017,10 +2037,11 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     // It doesn't actually matter which DeclContext we use, so just
     // use the imported header unit.
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+    auto var = new (SwiftContext) ParamDecl(SourceLoc(),
                                             SourceLoc(), argName,
                                             SourceLoc(), argName,
                                             ImportedHeaderUnit);
+    var->setSpecifier(ParamSpecifier::Default);
     var->setInterfaceType(type);
     swiftParams.push_back(var);
   };
@@ -2136,11 +2157,11 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     // Set up the parameter info.
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           ParamDecl::Specifier::Default,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
                                            ImportedHeaderUnit);
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
 
@@ -2248,11 +2269,11 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           ParamDecl::Specifier::Default,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,
                                            /*dummy DC*/ImportedHeaderUnit);
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(propertyTy);
 
     *params = ParameterList::create(SwiftContext, paramInfo);

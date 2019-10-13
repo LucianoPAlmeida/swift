@@ -64,8 +64,7 @@ static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   // that's a real thing.
   if (results.size() == 1) {
     if (auto typeDecl = dyn_cast<TypeDecl>(results[0]))
-      if (typeDecl->hasInterfaceType())
-        return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
+      return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
   }
   return CanType();
 }
@@ -86,6 +85,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/OpenCLExtensionTypes.def"
+#define SVE_TYPE(Name, Id, SingletonId)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/AArch64SVEACLETypes.def"
   }
 
   llvm_unreachable("Not a valid BuiltinType.");
