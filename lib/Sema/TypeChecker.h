@@ -800,10 +800,6 @@ public:
 
   void validateDecl(ValueDecl *D);
 
-  /// Validate the given extension declaration, ensuring that it
-  /// properly extends the nominal type it names.
-  void validateExtension(ExtensionDecl *ext);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
@@ -1020,8 +1016,8 @@ public:
   void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
-  Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
-                                   ReferenceOwnershipAttr *attr);
+  static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                          ReferenceOwnershipAttr *attr);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
