@@ -542,26 +542,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
 bool MissingConformanceFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto ownerType = getOwnerType();
   auto nonConformingType = getLHS();
   auto protocolType = getRHS();
 
-  auto getArgumentAt = [](const ApplyExpr *AE, unsigned index) -> Expr * {
-    assert(AE);
-
-    auto *arg = AE->getArg();
-    if (auto *TE = dyn_cast<TupleExpr>(arg))
-      return TE->getElement(index);
-
-    assert(index == 0);
-    if (auto *PE = dyn_cast<ParenExpr>(arg))
-      return PE->getSubExpr();
-
-    return arg;
-  };
-
   // If this is a requirement of a pattern-matching operator,
-  // let's see whether argument is already has a fix associated
+  // let's see whether argument already has a fix associated
   // with it and if so skip conformance error, otherwise we'd
   // produce an unrelated `<type> doesn't conform to Equatable protocol`
   // diagnostic.
@@ -588,43 +573,14 @@ bool MissingConformanceFailure::diagnoseAsError() {
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
-  Optional<unsigned> atParameterPos;
-  // Sometimes fix is recorded by type-checking sub-expression
-  // during normal diagnostics, in such case call expression
-  // is unavailable.
-  if (Apply) {
-    if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
-      auto parameters = fnType->getParams();
-      for (auto index : indices(parameters)) {
-        if (parameters[index].getOldType()->isEqual(nonConformingType)) {
-          atParameterPos = index;
-          break;
-        }
-      }
-    }
-  }
-
   if (nonConformingType->isObjCExistentialType()) {
     emitDiagnostic(anchor->getLoc(), diag::protocol_does_not_conform_static,
                    nonConformingType, protocolType);
     return true;
   }
 
-  if (diagnoseTypeCannotConform((atParameterPos ?
-                                getArgumentAt(Apply, *atParameterPos) : anchor),
-                                nonConformingType, protocolType)) {
-      return true;
-  }
-
-  if (atParameterPos) {
-    // Requirement comes from one of the parameter types,
-    // let's try to point diagnostic to the argument expression.
-    auto *argExpr = getArgumentAt(Apply, *atParameterPos);
-    emitDiagnostic(argExpr->getLoc(),
-                   diag::cannot_convert_argument_value_protocol,
-                   nonConformingType, protocolType);
+  if (diagnoseTypeCannotConform(anchor, nonConformingType, protocolType))
     return true;
-  }
 
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
@@ -803,8 +759,13 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
-    assert(isa<AssignExpr>(anchor));
-    diagnostic = getDiagnosticFor(CTP_AssignSource);
+    if (isa<AssignExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+    } else if (isa<CoerceExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_CoerceOperand);
+    } else {
+      return false;
+    }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
@@ -998,45 +959,20 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
-  auto &TC = getTypeChecker();
-
   auto *expr = getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
-  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
-  if (!coerceExpr)
-    return false;
 
-  auto *subExpr = coerceExpr->getSubExpr();
-  auto fromType = getType(subExpr)->getRValueType();
-  auto toType = resolveType(coerceExpr->getCastTypeLoc().getType());
+  auto *coerceExpr = cast<CoerceExpr>(expr);
 
-  auto castKind =
-      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                              getDC(), coerceExpr->getLoc(), subExpr,
-                              coerceExpr->getCastTypeLoc().getSourceRange());
+  auto fromType = getFromType();
+  auto toType = getToType();
 
-  switch (castKind) {
-  // Invalid cast.
-  case CheckedCastKind::Unresolved:
-    // Fix didn't work, let diagnoseFailureForExpr handle this.
-    return false;
-  case CheckedCastKind::Coercion:
-  case CheckedCastKind::BridgingCoercion:
-    llvm_unreachable("Coercions handled in other disjunction branch");
-
-  // Valid casts.
-  case CheckedCastKind::ArrayDowncast:
-  case CheckedCastKind::DictionaryDowncast:
-  case CheckedCastKind::SetDowncast:
-  case CheckedCastKind::ValueCast:
-    emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                   fromType, toType)
-        .highlight(coerceExpr->getSourceRange())
-        .fixItReplace(coerceExpr->getLoc(), "as!");
-    return true;
-  }
-  llvm_unreachable("unhandled cast kind");
+  emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast, fromType,
+                 toType)
+      .highlight(coerceExpr->getSourceRange())
+      .fixItReplace(coerceExpr->getLoc(), "as!");
+  return true;
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {
