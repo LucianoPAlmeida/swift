@@ -2503,7 +2503,8 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  if (path.empty()) {
+  if (path.empty() ||
+      path.back().getKind() == ConstraintLocator::ExplicitTypeCoercion) {
     if (!anchor)
       return false;
 
@@ -3125,7 +3126,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
     if (desugar1->isEqual(desugar2)) {
-      if (kind >= ConstraintKind::Conversion) {
+      if (kind >= ConstraintKind::Conversion &&
+          !flags.contains(TMF_ApplyingFix)) {
         if (RemoveUnnecessaryCoercion::attempt(*this, type1, type2,
                                                getConstraintLocator(locator))) {
           return getTypeMatchFailure(locator);
