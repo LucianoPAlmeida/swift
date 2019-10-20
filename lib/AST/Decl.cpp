@@ -2783,8 +2783,13 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+static bool isComputingInterfaceType(const ValueDecl *VD) {
+  return VD->getASTContext().evaluator.hasActiveRequest(
+            InterfaceTypeRequest{const_cast<ValueDecl *>(VD)});
+}
+
 bool ValueDecl::isRecursiveValidation() const {
-  if (hasValidationStarted() && !hasInterfaceType())
+  if (isComputingInterfaceType(this) && !hasInterfaceType())
     return true;
 
   if (auto *vd = dyn_cast<VarDecl>(this))
@@ -2805,30 +2810,24 @@ bool ValueDecl::isRecursiveValidation() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  if (!hasInterfaceType()) {
-    // Our clients that don't register the lazy resolver are relying on the
-    // fact that they can't pull an interface type out to avoid doing work.
-    // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver()) {
-      resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
-      if (!hasInterfaceType())
-        return ErrorType::get(getASTContext());
-    }
+  // Our clients that don't register the lazy resolver are relying on the
+  // fact that they can't pull an interface type out to avoid doing work.
+  // This is a necessary evil until we can wean them off.
+  if (!getASTContext().getLazyResolver()) {
+    return TypeAndAccess.getPointer();
   }
-  return TypeAndAccess.getPointer();
+
+  if (auto Ty =
+          evaluateOrDefault(getASTContext().evaluator,
+                            InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
+                            ErrorType::get(getASTContext())))
+    return Ty;
+  return ErrorType::get(getASTContext());
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
-
-    if (type->hasError())
-      setInvalid();
-  }
-
-  TypeAndAccess.setPointer(type);
+  getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{this},
+                                        std::move(type));
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
@@ -4001,7 +4000,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) cons
   do {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
     // However we have to explicitly guard against that here because we get
-    // called as part of validateDecl().
+    // called as part of the interface type request.
     if (!visited.insert(CD).second)
       break;
 
@@ -7408,21 +7407,6 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
-}
-
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
-    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
-  auto *dc = descriptor.dc;
-  PrecedenceGroupDecl *group = nullptr;
-  if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
-                                      descriptor.nameLoc);
-  } else {
-    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
-                                                         descriptor.nameLoc);
-  }
-  return group;
 }
 
 PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {

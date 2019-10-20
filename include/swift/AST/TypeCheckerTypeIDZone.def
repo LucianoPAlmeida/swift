@@ -67,6 +67,8 @@ SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               SeparatelyCached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
+              Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
@@ -82,6 +84,9 @@ SWIFT_REQUEST(TypeChecker, IsObjCRequest, bool(ValueDecl *), SeparatelyCached,
 SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LookupPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
