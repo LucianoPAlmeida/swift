@@ -156,7 +156,13 @@ protected:
   }
 
   /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const { return HasComplexLocator; }
+  bool hasComplexLocator() const {
+    bool isExplicitCoercion =
+        getLocator()
+            ->isLastElement<
+                ConstraintLocator::PathElement::ExplicitTypeCoercion>();
+    return HasComplexLocator && !isExplicitCoercion;
+  }
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.

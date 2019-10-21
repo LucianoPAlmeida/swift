@@ -971,15 +971,8 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
 }
 
 bool MissingForcedDowncastFailure::diagnoseAsError() {
-  bool isExplicitCoercion =
-      getLocator()
-          ->isLastElement<
-              ConstraintLocator::PathElement::ExplicitTypeCoercion>();
-
-  if (!isExplicitCoercion) {
-    if (hasComplexLocator())
-      return false;
-  }
+  if (hasComplexLocator())
+    return false;
 
   auto *expr = getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
