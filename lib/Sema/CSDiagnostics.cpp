@@ -4523,9 +4523,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (cs.hasFixFor(locator))
       return false;
   }
 
@@ -5140,6 +5138,35 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool UnnecessaryCoercionFailure::diagnoseAsError() {
+  auto expr = cast<CoerceExpr>(getAnchor());
+  auto sourceRange =
+      SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
+  auto castType = expr->getCastTypeLoc().getType();
+  
+  if (isa<TypeAliasType>(getFromType().getPointer()) &&
+      isa<TypeAliasType>(getToType().getPointer())) {
+    auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
+    auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
+    // If the typealias are different, we need a warning mentioning both types.
+    if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
+      emitDiagnostic(expr->getLoc(),
+                     diag::unnecessary_same_typealias_type_coercion,
+                     getFromType(), castType)
+          .fixItRemove(sourceRange);
+    } else {
+      emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                     castType)
+          .fixItRemove(sourceRange);
+    }
+  } else {
+    emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                   castType)
+        .fixItRemove(sourceRange);
+  }
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = getAnchor();
@@ -5481,14 +5508,14 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
     return false;
 
-  auto *argType = cs.createTypeVariable(
-      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
-      /*flags=*/0);
+  auto argLocator =
+      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1));
+  auto *argType = cs.createTypeVariable(argLocator, /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
   auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
-  cs.assignFixedType(argType, param.getOldType());
+  cs.assignFixedType(argType, param.getOldType(), argLocator);
 
   auto *anchor = getRawAnchor();
 
