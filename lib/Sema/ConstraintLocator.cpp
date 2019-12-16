@@ -113,6 +113,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathValue:
   case ConstraintLocator::KeyPathComponentResult:
   case ConstraintLocator::Condition:
+  case ConstraintLocator::ExplicitTypeCoercion:
   case ConstraintLocator::DynamicCallable:
     return 0;
 
@@ -453,6 +454,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case Condition:
       out << "condition expression";
+      break;
+        
+    case ExplicitTypeCoercion:
+      out << "type coercion";
       break;
 
     case DynamicCallable:

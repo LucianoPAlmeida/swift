@@ -167,6 +167,9 @@ CUSTOM_LOCATOR_PATH_ELT(Witness)
 /// The condition associated with 'if' expression or ternary operator.
 SIMPLE_LOCATOR_PATH_ELT(Condition)
 
+/// An explicit type coercion.
+SIMPLE_LOCATOR_PATH_ELT(ExplicitTypeCoercion)
+
 SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
 
 #undef LOCATOR_PATH_ELT
