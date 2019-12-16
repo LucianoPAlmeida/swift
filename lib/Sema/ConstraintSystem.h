@@ -1262,6 +1262,9 @@ private:
   using FixedRequirement = std::tuple<TypeBase *, RequirementKind, TypeBase *>;
   SmallVector<FixedRequirement, 4> FixedRequirements;
 
+  /// Intended to track information about type variable source binding locator.
+  llvm::DenseMap<const TypeVariableType *, const ConstraintLocator *> TypeVariableBindings;
+  
   bool hasFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
     auto reqInfo = std::make_tuple(lhs.getPointer(), kind, rhs.getPointer());
     return llvm::any_of(
@@ -1296,6 +1299,18 @@ public:
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
+  
+  /// Records the current binding source locator for a given type variable in the system.
+  void recordTypeVariableBindingLocator(const TypeVariableType *typeVar,
+                                        const ConstraintLocator *sourceLocator) {
+    TypeVariableBindings[typeVar] = sourceLocator;
+  }
+  
+  /// Gets the current binding source locator for a given type variable in the system.
+  const ConstraintLocator *
+  getTypeVariableBindingLocator(const TypeVariableType *typeVar) {
+    return TypeVariableBindings[typeVar];
+  }
 
 private:
   /// Describe the candidate expression for partial solving.
@@ -2614,12 +2629,14 @@ public:
   ///
   /// \param type The fixed type to which the type variable will be bound.
   ///
+  /// \param locator The locator from where this fixed type comes from.
+  ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       bool updateState = true);
-  
+                       ConstraintLocator *locator, bool updateState = true);
+
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.
   static Optional<Type> isArrayType(Type type);
@@ -4376,7 +4393,7 @@ public:
   }
 
   bool attempt(ConstraintSystem &cs) const;
-
+  
   void print(llvm::raw_ostream &Out, SourceManager *) const {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;

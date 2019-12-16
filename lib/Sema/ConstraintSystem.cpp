@@ -156,6 +156,7 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
+                                       ConstraintLocator *locator,
                                        bool updateState) {
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
@@ -199,6 +200,9 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     }
   }
 
+  // Recording fixed type source locator for type variable.
+  recordTypeVariableBindingLocator(typeVar, locator);
+  
   // Notify the constraint graph.
   CG.bindTypeVariable(typeVar, type);
   addTypeVariableConstraintsToWorkList(typeVar);
@@ -3248,6 +3252,11 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::Condition: {
       anchor = cast<IfExpr>(anchor)->getCondExpr();
+      path = path.slice(1);
+      continue;
+    }
+        
+    case ConstraintLocator::ExplicitTypeCoercion: {
       path = path.slice(1);
       continue;
     }
