@@ -35,6 +35,7 @@ class raw_ostream;
 namespace swift {
 
 class SourceManager;
+class CalleeCandidateInfo;
 
 namespace constraints {
 
@@ -235,6 +236,10 @@ enum class FixKind : uint8_t {
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
+  
+  /// Constructor call argument label mismatch to diagnose when a labeled initializer
+  /// doesn't match any of the overload candidates.
+  InitArgumentLabelMismatch,
 };
 
 class ConstraintFix {
@@ -1622,6 +1627,24 @@ public:
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
+};
+
+class InitArgumentLabelMismatch final : public ConstraintFix {
+  CalleeCandidateInfo &calleeInfo;
+
+  InitArgumentLabelMismatch(ConstraintSystem &cs,
+                            CalleeCandidateInfo &calleeInfo,
+                            ConstraintLocator *locator)
+  : ConstraintFix(cs, FixKind::InitArgumentLabelMismatch, locator),
+        calleeInfo(calleeInfo) {}
+
+public:
+  std::string getName() const { return "init argument labels mismatch"; }
+
+  bool diagnose(bool asNote = false) const;
+
+  static InitArgumentLabelMismatch *attempt(ConstraintSystem &cs,
+                                            ConstraintLocator *locator);
 };
 
 } // end namespace constraints

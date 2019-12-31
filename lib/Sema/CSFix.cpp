@@ -18,6 +18,7 @@
 
 #include "CSFix.h"
 #include "CSDiagnostics.h"
+#include "CalleeCandidateInfo.h"
 #include "ConstraintLocator.h"
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
@@ -1166,4 +1167,40 @@ SpecifyClosureReturnType *
 SpecifyClosureReturnType::create(ConstraintSystem &cs,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
+}
+
+bool InitArgumentLabelMismatch::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InitLabelNotMatchAnyOverloadFailure failure(cs, calleeInfo, getLocator());
+  return failure.diagnose(asNote);
+}
+
+
+InitArgumentLabelMismatch *
+InitArgumentLabelMismatch::attempt(ConstraintSystem &cs, ConstraintLocator *locator) {
+  auto anchor = locator->getAnchor();
+  
+  if (!isa<CallExpr>(anchor))
+    return nullptr;
+  
+  auto callExpr = cast<CallExpr>(anchor);
+  auto argExpr = callExpr->getArg();
+  auto fnExpr = callExpr->getFn();
+    
+  bool hasTrailingClosure = false;
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr))
+    hasTrailingClosure = PE->hasTrailingClosure();
+  else if (auto *TE = dyn_cast<TupleExpr>(argExpr))
+    hasTrailingClosure = TE->hasTrailingClosure();
+  
+  CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, cs);
+  
+  // Filter the candidate list based on the argument we may or may not have.
+  calleeInfo.filterContextualMemberList(argExpr);
+
+  // Handle argument label mismatches when we have multiple candidates.
+  if (calleeInfo.closeness != CC_ArgumentLabelMismatch)
+    return nullptr;
+
+  return new (cs.getAllocator()) InitArgumentLabelMismatch(cs, calleeInfo, locator);;
 }
