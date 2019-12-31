@@ -30,6 +30,9 @@
 #include <tuple>
 
 namespace swift {
+
+class CalleeCandidateInfo;
+
 namespace constraints {
 
 class FunctionArgApplyInfo;
@@ -1918,6 +1921,22 @@ public:
                                  ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator) {}
 
+  bool diagnoseAsError();
+};
+
+class InitLabelNotMatchAnyOverloadFailure final : public FailureDiagnostic {
+  CalleeCandidateInfo &calleeInfo;
+  
+  public:
+  InitLabelNotMatchAnyOverloadFailure(ConstraintSystem &cs,
+                                      CalleeCandidateInfo &calleeInfo,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), calleeInfo(calleeInfo) {
+        assert(isa<CallExpr>(locator->getAnchor()));
+      }
+  
+  CalleeCandidateInfo &getCalleeInfo() { return calleeInfo; }
+  
   bool diagnoseAsError();
 };
 

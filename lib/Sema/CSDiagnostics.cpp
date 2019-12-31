@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "CalleeCandidateInfo.h"
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "TypoCorrection.h"
@@ -5942,4 +5943,33 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
   }
 
   return true;
+}
+
+bool InitLabelNotMatchAnyOverloadFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+  auto locator = getLocator();
+  
+  auto callExpr = cast<CallExpr>(locator->getAnchor());
+  auto fnExpr = callExpr->getFn();
+  auto argExpr = callExpr->getArg();
+  
+  auto argLabels = callExpr->getArgumentLabels();
+  auto &calleeInfo = getCalleeInfo();
+
+  // Handle argument label mismatches when we have multiple candidates.
+  auto argType = cs.getType(argExpr);
+  SmallVector<AnyFunctionType::Param, 4> args;
+  AnyFunctionType::decomposeInput(argType, args);
+  AnyFunctionType::relabelParams(args, argLabels);
+
+  // If we have multiple candidates that we fail to match, just say we have
+  // the wrong labels and list the candidates out.
+  emitDiagnostic(callExpr->getLoc(), diag::wrong_argument_labels_overload,
+           getParamListAsString(args))
+      .highlight(argExpr->getSourceRange());
+
+  // Did the user intend on invoking a different overload?
+  calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
+  return true;
+
 }
