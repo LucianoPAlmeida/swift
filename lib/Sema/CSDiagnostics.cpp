@@ -1583,6 +1583,13 @@ bool AssignmentFailure::diagnoseAsError() {
   }
 
   if (auto LE = dyn_cast<LiteralExpr>(immutableExpr)) {
+    if (auto *coerceExpr = dyn_cast<CoerceExpr>(DestExpr)) {
+      emitDiagnostic(Loc, diag::cannot_apply_lvalue_binop_to_rvalue,
+                     cs.getType(coerceExpr->getCastTypeLoc()))
+          .highlight(LE->getSourceRange());
+      return true;
+    }
+    
     emitDiagnostic(Loc, DeclDiagnostic, "literals are not mutable")
         .highlight(LE->getSourceRange());
     return true;
