@@ -174,11 +174,11 @@ func testConvertOverflow() {
   let _ /*ssint8_zero2*/  = Int8(uint8_zero)
 
   // Check signed to unsigned extending size conversions.
-  var _ = UInt16(Int8(-1)) // FIXME: false negative: overflow that is not caught
+  var _ = UInt16(Int8(-1)) // expected-error {{negative integer '-1' overflows when stored into unsigned type 'UInt16'}}
     // (see also <rdar://problem/39120081>)
-  var _ = UInt64(Int16(-200)) // FIXME: false negative: overflow that is not
+  var _ = UInt64(Int16(-200)) // expected-error {{negative integer '-200' overflows when stored into unsigned type 'UInt64'}}
     // caught by diagnostics (see also <rdar://problem/39120081>)
-  var _ = UInt64(Int32(-200)) // FIXME: false negative: overflow that is not
+  var _ = UInt64(Int32(-200)) // expected-error {{negative integer '-200' overflows when stored into unsigned type 'UInt64'}}
     // caught by diagnostics (see also <rdar://problem/39120081>)
   Int16(Int8(-1)) // expected-warning{{unused}}
   Int64(Int16(-200)) // expected-warning{{unused}}
