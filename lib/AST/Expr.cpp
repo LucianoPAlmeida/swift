@@ -194,7 +194,10 @@ Expr *Expr::getSemanticsProvidingExpr() {
 
   if (auto *TE = dyn_cast<TryExpr>(this))
     return TE->getSubExpr()->getSemanticsProvidingExpr();
-
+  
+  if (auto *CE = dyn_cast<CoerceExpr>(this))
+    return CE->getSubExpr()->getSemanticsProvidingExpr();
+  
   return this;
 }
 
