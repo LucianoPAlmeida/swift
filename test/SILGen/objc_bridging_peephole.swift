@@ -327,8 +327,16 @@ func testMethodArgument(dummy: DummyClass) {
   // CHECK:      // function_ref
   // CHECK-NEXT: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
-  // CHECK-NEXT: [[METHOD:%.*]] = objc_method
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
   dummy.takeNullableString(makeNS() as String)
@@ -336,8 +344,16 @@ func testMethodArgument(dummy: DummyClass) {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
-  // CHECK-NEXT: [[METHOD:%.*]] = objc_method
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
   dummy.takeNullproneString(makeNS() as String)
@@ -401,16 +417,32 @@ func testPropertySetter(dummy: DummyClass) {
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
-  // CHECK-NEXT: [[METHOD:%.*]] = objc_method
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
   dummy.nullableStringProperty = makeNS() as String
 
   // CHECK: [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
-  // CHECK-NEXT: [[METHOD:%.*]] = objc_method
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK:      [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: apply [[METHOD]]([[OPTARG]], [[SELF]])
   // CHECK-NEXT: destroy_value [[OPTARG]]
   dummy.nullproneStringProperty = makeNS() as String
@@ -485,7 +517,15 @@ func testNullableSubscriptSet(object: NullableSubscript, index: AnyObject) {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $NullableSubscript,
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
@@ -523,7 +563,15 @@ func testNullproneSubscriptSet(object: NullproneSubscript, index: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NullproneSubscript,
   // CHECK:      [[MAKE:%.*]] = function_ref @$s22objc_bridging_peephole6makeNSSo8NSStringCyF
   // CHECK-NEXT: [[ARG:%.*]] = apply [[MAKE]]()
-  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[NSSTRING_TO_STRING:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+  // CHECK-NEXT: [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]] : $NSString
+  // CHECK-NEXT: [[META: %.*]] = metatype 
+  // CHECK-NEXT: [[ARG:%.*]] = apply [[NSSTRING_TO_STRING]]
+  // CHECK:      // function_ref
+  // CHECK-NEXT: [[STRING_TO_NSSTRING:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:      [[ARG:%.*]] = apply [[STRING_TO_NSSTRING]]
+  // CHECK:      [[OPTARG:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[ARG]]
   // CHECK:      [[BRIDGE_TO_ID:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
   // CHECK-NEXT: [[INDEX:%.*]] = apply [[BRIDGE_TO_ID]]
   // CHECK:      [[METHOD:%.*]] = objc_method
